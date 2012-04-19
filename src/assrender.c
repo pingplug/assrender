@@ -1,6 +1,8 @@
 #include "avisynth_c.h"
 #include <ass/ass.h>
 #include <fontconfig/fontconfig.h>
+#include <stdlib.h>
+#include <math.h>
 
 #define _r(c)  ((c)>>24)
 #define _g(c)  (((c)>>16)&0xFF)
@@ -11,15 +13,86 @@ ASS_Library *ass_library;
 ASS_Renderer *ass_renderer;
 ASS_Track *ass;
 
+int64_t *timestamp;
+int isvfr = 0;
+
+int parse_timecodesv1(FILE *f, int total) {
+    // we generate our timecodes for all frames and put them into an array
+    int start, end, n = 0;
+    double t = 0.0, basefps = 0.0, fps;
+    int64_t ts[total];
+    char l[1025];
+
+    while ((fgets(l, 1024, f) != NULL) && n < total) {
+        if (l[0] == 0 || l[0] == '\n' || l[0] == '\r' || l[0] == '#')
+            continue;
+
+        if (sscanf(l, "Assume %lf", &basefps) == 1)
+            continue;
+
+        if (!sscanf(l, "%d,%d,%lf", &start, &end, &fps) == 3)
+            continue;
+
+        if (basefps == 0.0)
+            continue;
+
+        while (n < start) {
+            ts[n++] = (int64_t)rint(t);
+            t += 1000.0/basefps;
+        }
+
+        while (n <= end) {
+            ts[n++] = (int64_t)rint(t);
+            t += 1000.0/fps;
+        }
+    }
+
+    fclose(f);
+
+    if (basefps == 0.0)
+        return 0;
+
+    while (n < total) {
+        ts[n++] = (int64_t)rint(t);
+        t += 1000.0/basefps;
+    }
+
+    timestamp = ts;
+    return 1;
+}
+
+int parse_timecodesv2(FILE *f, int total) {
+    int n = 0;
+    int64_t ts[total];
+    char l[1025];
+
+    while ((fgets(l, 1024, f) != NULL) && n < total) {
+        if (l[0] == 0 || l[0] == '\n' || l[0] == '\r' || l[0] == '#')
+            continue;
+
+        // naive but works unless someone is fucking with us
+        ts[n++] = (int64_t)atoi(l);
+    }
+
+    fclose(f);
+
+    if (n < total)
+        return 0;
+
+    timestamp = ts;
+    return 1;
+}
+
 void msg_callback(int level, const char *fmt, va_list va, void *data) {
-    if (level > (int*)data)
+    if (level > (int)data)
         return;
     printf("libass: ");
     vprintf(fmt, va);
     printf("\n");
 }
 
-static int init_ass(int w, int h, double scale, ASS_Hinting hinting, int verbosity) {
+static int init_ass(int w, int h, double scale, ASS_Hinting hinting,
+                    int verbosity) {
     ass_library = ass_library_init();
     if (!ass_library)
         return 0;
@@ -63,9 +136,15 @@ AVS_VideoFrame *AVSC_CC assrender_get_frame(AVS_FilterInfo * p, int n) {
     row_size = avs_get_row_size(src);
     height = avs_get_height(src);
 
-    // it’s a casting party!
-    int64_t ts = (int64_t)n * (int64_t)1000 * (int64_t)p->vi.fps_denominator /
-                 (int64_t)p->vi.fps_numerator;
+    int64_t ts;
+    if (isvfr < 1) {
+        // it’s a casting party!
+        ts = (int64_t)n * (int64_t)1000 * (int64_t)p->vi.fps_denominator /
+             (int64_t)p->vi.fps_numerator;
+    }
+    else {
+        ts = timestamp[n];
+    }
 
     ASS_Image *img = ass_render_frame(ass_renderer, ass, ts, NULL);
 
@@ -105,8 +184,8 @@ AVS_VideoFrame *AVSC_CC assrender_get_frame(AVS_FilterInfo * p, int n) {
                 dst++;
             }
 
-            dst -= dst_delta;	// back up one scanline (remembering we're rendering bottom-to-top)
-            src += img->stride;	// advance source one scanline
+            dst -= dst_delta;   // back up a scanline (rendering bottom-to-top)
+            src += img->stride; // advance source one scanline
         }
 
         img = img->next;
@@ -114,12 +193,12 @@ AVS_VideoFrame *AVSC_CC assrender_get_frame(AVS_FilterInfo * p, int n) {
     return src;
 }
 
-
-AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment *env, AVS_Value args, void *dg) {
+AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment *env, AVS_Value args,
+                                   void *dg) {
     AVS_Value v;
     AVS_FilterInfo * fi;
     AVS_Clip *c = avs_new_c_filter(env, &fi, avs_array_elt(args, 0), 1);
-
+    char e[250];
     if (!avs_is_rgb32(&fi->vi)) {
         v = avs_new_value_error("AssRender: Only RGB32 is supported!");
         avs_release_clip(c);
@@ -127,10 +206,14 @@ AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment *env, AVS_Value args, v
     }
 
     const char *f = avs_as_string(avs_array_elt(args, 1));
-    int h = avs_is_int(avs_array_elt(args, 2)) ? avs_as_int(avs_array_elt(args, 2)) : 3;
-    double scale = avs_is_float(avs_array_elt(args, 3)) ? avs_as_float(avs_array_elt(args, 3)) : 1.0;
-    const char *cs = avs_as_string(avs_array_elt(args, 4)) ? avs_as_string(avs_array_elt(args, 4)) : "UTF-8";
-    int verbosity = avs_is_int(avs_array_elt(args, 5)) ? avs_as_int(avs_array_elt(args, 5)) : 0;
+    int h = avs_is_int(avs_array_elt(args, 2)) ?
+            avs_as_int(avs_array_elt(args, 2)) : 3;
+    double scale = avs_is_float(avs_array_elt(args, 3)) ?
+                   avs_as_float(avs_array_elt(args, 3)) : 1.0;
+    const char *cs = avs_as_string(avs_array_elt(args, 4)) ?
+                     avs_as_string(avs_array_elt(args, 4)) : "UTF-8";
+    int verbosity = avs_is_int(avs_array_elt(args, 5)) ?
+                    avs_as_int(avs_array_elt(args, 5)) : 0;
     const char *vfr = avs_as_string(avs_array_elt(args, 6));
     ASS_Hinting hinting;
 
@@ -167,11 +250,46 @@ AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment *env, AVS_Value args, v
 
     ass = ass_read_file(ass_library, f, cs);
     if (!ass) {
-        char e[250];
         sprintf(e, "AssRender: could not read '%s'", f);
         v = avs_new_value_error(e);
         avs_release_clip(c);
         return v;
+    }
+
+    if (vfr) {
+        FILE *fh = fopen(vfr, "r");
+        if (!fh) {
+            sprintf(e, "AssRender: could not read timecodes file '%s'", vfr);
+            v = avs_new_value_error(e);
+            avs_release_clip(c);
+            return v;
+        }
+        isvfr = 1;
+        int ver;
+        if (fscanf(fh, "# timecode format v%d", &ver) != 1) {
+            sprintf(e, "AssRender: invalid timecodes file '%s'", vfr);
+            v = avs_new_value_error(e);
+            avs_release_clip(c);
+            return v;
+        }
+        switch (ver) {
+        case 1:
+            if (!parse_timecodesv1(fh, fi->vi.num_frames)) {
+                v = avs_new_value_error(
+                        "AssRender: error parsing timecodes file");
+                avs_release_clip(c);
+                return v;
+            }
+            break;
+        case 2:
+            if (!parse_timecodesv2(fh, fi->vi.num_frames)) {
+                v = avs_new_value_error(
+                        "AssRender: timecodes file had less frames than expected");
+                avs_release_clip(c);
+                return v;
+            }
+            break;
+        }
     }
 
     fi->get_frame = assrender_get_frame;
@@ -182,6 +300,9 @@ AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment *env, AVS_Value args, v
 }
 
 const char *AVSC_CC avisynth_c_plugin_init(AVS_ScriptEnvironment *env) {
-    avs_add_function(env, "assrender", "c[file]s[hinting]i[scale]f[charset]s[verbosity]i[vfr]s", assrender_create, 0);
-    return "AssRender 0.15: draws .asses better and faster than ever before";
+    avs_add_function(env, "assrender",
+                     "c[file]s[hinting]i[scale]f[charset]s[verbosity]i[vfr]s",
+                     assrender_create, 0);
+    return "AssRender 0.16: draws .asses better and faster than ever before";
 }
+
