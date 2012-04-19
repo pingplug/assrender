@@ -250,8 +250,10 @@ void blit_rgb (unsigned char *data, ASS_Image *img, unsigned int pitch,
         unsigned char outa;
         unsigned char *sp = img->bitmap;
 
-        if (img->w == 0 || img->h == 0)
+        if (img->w == 0 || img->h == 0) {
+            img = img->next;
             continue;
+        }
 
         // Move destination pointer to the bottom right corner of the
         // bounding box that contains the current overlay bitmap.
@@ -311,8 +313,10 @@ void blit444 (ASS_Image *img, unsigned char *dataY, unsigned char *dataU,
         unsigned char *dstu = dataU + img->dst_x + img->dst_y * pitch;
         unsigned char *dstv = dataV + img->dst_x + img->dst_y * pitch;
 
-        if (img->w == 0 || img->h == 0)
+        if (img->w == 0 || img->h == 0) {
+            img = img->next;
             continue;
+        }
 
         for (i = 0; i < img->h; ++i) {
             for (j = 0; j < img->w; ++j) {
@@ -496,8 +500,10 @@ AVS_VideoFrame *AVSC_CC assrender_get_frame (AVS_FilterInfo *p, int n) {
                     unsigned char *dsty =
                         dataY + img->dst_x + img->dst_y * pitch;
 
-                    if (img->w == 0 || img->h == 0)
+                    if (img->w == 0 || img->h == 0) {
+                        img = img->next;
                         continue;
+                    }
 
                     for (i = 0; i < img->h; ++i) {
                         for (j = 0; j < img->w; ++j) {
@@ -701,7 +707,7 @@ const char *AVSC_CC avisynth_c_plugin_init (AVS_ScriptEnvironment *env) {
                       "[sar]f[top]i[bottom]i[left]i[right]i[charset]s"
                       "[debuglevel]i[fontdir]s[srt_font]s",
                       assrender_create, 0);
-    return "AssRender 0.21: draws .asses better and faster than ever before";
+    return "AssRender 0.22: draws .asses better and faster than ever before";
 }
 
 // kate: indent-mode cstyle; space-indent on; indent-width 4; replace-tabs on; 
