@@ -17,13 +17,13 @@
 #define _g(c)  (((c)>>16)&0xFF)
 #define _b(c)  (((c)>>8)&0xFF)
 #define _a(c)  ((c)&0xFF)
-// FIXME: bt470bg only? someone explain this shit to me
+
 #define rgba2y(c)  ( (( 263*_r(c) + 516*_g(c) + 100*_b(c)) >> 10) + 16  )
 #define rgba2u(c)  ( ((-152*_r(c) - 298*_g(c) + 450*_b(c)) >> 10) + 128 )
 #define rgba2v(c)  ( (( 450*_r(c) - 376*_g(c) -  73*_b(c)) >> 10) + 128 )
 
 #define k121(a, b, c)  ((a + b + b + c + 3) >> 2)
-#define alphablend(srcA, srcRGB, dstA, dstRGB, outA)  \
+#define blend(srcA, srcRGB, dstA, dstRGB, outA)  \
     (((srcA * 255 * srcRGB + (dstRGB * dstA * (255 - srcA))) / outA + 255) >> 8)
 
 #if defined(_WIN32) && !defined(__MINGW32__)
@@ -37,6 +37,11 @@ static int rint (double x) {
 #endif
 
 typedef struct {
+    unsigned char *uv_tmp[2];
+    struct lbounds {
+        uint16_t start;
+        uint16_t end;
+    } *lbounds;
     unsigned int isvfr;
     ASS_Track *ass;
     ASS_Library *ass_library;
@@ -235,217 +240,115 @@ int init_ass (int w, int h, double scale, double line_spacing,
     return 1;
 }
 
-void blit_rgb32 (unsigned char *dst, ASS_Image *img, unsigned int dst_delta) {
-    int x, y, k, c = 0;
-    unsigned char a, r, g, b;
-    unsigned char *sp = img->bitmap;
-    unsigned char outa;
+void blit_rgb (unsigned char *data, ASS_Image *img, unsigned int pitch,
+               unsigned int height, unsigned int numc) {
+    while (img) {
+        unsigned char *dst;
+        unsigned int dst_delta;
+        int x, y, k, c = 0;
+        unsigned char a, r, g, b;
+        unsigned char outa;
+        unsigned char *sp = img->bitmap;
 
-    a = 255 - _a (img->color);
-    r = _r (img->color);
-    g = _g (img->color);
-    b = _b (img->color);
+        if (img->w == 0 || img->h == 0)
+            continue;
 
-    for (y = 0; y < img->h; y++) {
-        for (x = 0; x < img->w; ++x) {
-            k = (sp[x] * a + 255) >> 8;
+        // Move destination pointer to the bottom right corner of the
+        // bounding box that contains the current overlay bitmap.
+        // Remember that avisynth RGB bitmaps are upside down, hence we
+        // need to render upside down.
+        dst =
+            data + (pitch * (height - img->dst_y - 1)) + img->dst_x * numc;
+        dst_delta = pitch + img->w * numc;
 
-            if (k) {
-                outa = (k * 255 + (dst[c + 3] * (255 - k)) + 255) >> 8;
-                dst[c    ] = alphablend (k, b, dst[c + 3], dst[c    ], outa);
-                dst[c + 1] = alphablend (k, g, dst[c + 3], dst[c + 1], outa);
-                dst[c + 2] = alphablend (k, r, dst[c + 3], dst[c + 2], outa);
-                dst[c + 3] = outa;
+        a = 255 - _a (img->color);
+        r = _r (img->color);
+        g = _g (img->color);
+        b = _b (img->color);
+
+
+        for (y = 0; y < img->h; y++) {
+            for (x = 0; x < img->w; ++x) {
+                k = (sp[x] * a + 255) >> 8;
+
+                if (k && numc == 4) {
+                    outa = (k * 255 + (dst[c + 3] * (255 - k)) + 255) >> 8;
+                    dst[c    ] = blend (k, b, dst[c + 3], dst[c    ], outa);
+                    dst[c + 1] = blend (k, g, dst[c + 3], dst[c + 1], outa);
+                    dst[c + 2] = blend (k, r, dst[c + 3], dst[c + 2], outa);
+                    dst[c + 3] = outa;
+                }
+                else {
+                    k = (sp[x] * a + 255) >> 8;
+                    dst[c    ] = (k * b + (255 - k) * dst[c    ] + 255) >> 8;
+                    dst[c + 1] = (k * g + (255 - k) * dst[c + 1] + 255) >> 8;
+                    dst[c + 2] = (k * r + (255 - k) * dst[c + 2] + 255) >> 8;
+                }
+
+                c += numc;
             }
 
-            c += 4;
+            dst -= dst_delta;
+            sp += img->stride;
         }
 
-        dst -= dst_delta;
-        sp += img->stride;
+        img = img->next;
     }
 }
 
-void blit_rgb24 (unsigned char *dst, ASS_Image *img, unsigned int dst_delta) {
-    int x, y, k;
-    unsigned char a, r, g, b;
-    unsigned char *sp = img->bitmap;
+void blit444 (ASS_Image *img, unsigned char *dataY, unsigned char *dataU,
+              unsigned char *dataV, unsigned int pitch) {
+    while (img) {
+        unsigned char y = rgba2y (img->color);
+        unsigned char u = rgba2u (img->color);
+        unsigned char v = rgba2v (img->color);
+        unsigned char opacity = 255 - _a (img->color);
 
-    a = 255 - _a (img->color);
-    r = _r (img->color);
-    g = _g (img->color);
-    b = _b (img->color);
+        int i, j;
 
-    for (y = 0; y < img->h; y++) {
-        for (x = 0; x < img->w; ++x) {
-            k = (sp[x] * a + 255) >> 8;
-            *dst++ = (k * b + (255 - k) * *dst + 255) >> 8;
-            *dst++ = (k * g + (255 - k) * *dst + 255) >> 8;
-            *dst++ = (k * r + (255 - k) * *dst + 255) >> 8;
-        }
+        unsigned char *src = img->bitmap;
+        unsigned char *dsty = dataY + img->dst_x + img->dst_y * pitch;
+        unsigned char *dstu = dataU + img->dst_x + img->dst_y * pitch;
+        unsigned char *dstv = dataV + img->dst_x + img->dst_y * pitch;
 
-        dst -= dst_delta;
-        sp += img->stride;
-    }
-}
+        if (img->w == 0 || img->h == 0)
+            continue;
 
-void blit_yuy2 (unsigned char *dst, ASS_Image *img, int pitch) {
-    int x, y, k;
-    unsigned char a, Y, U, V;
-    unsigned char *sp = img->bitmap;
-
-    a = 255 - _a (img->color);
-    Y = rgba2y (img->color);
-    U = rgba2u (img->color);
-    V = rgba2v (img->color);
-
-    for (y = 0; y < img->h; y++) {
-        for (x = 0; x < img->w * 2; x += 2) {
-            k = (sp[x >> 1] * a + 255) >> 8;
-            dst[x] = (k * Y + (255 - k) * dst[x] + 255) >> 8;
-            dst[x + 2] = (k * Y + (255 - k) * dst[x + 2] + 255) >> 8;
-            // so far so good, but how does YUY2 chroma work?
-        }
-
-        dst += pitch;
-        sp += img->stride;
-    }
-}
-
-void blit_y (unsigned char *dsty, int pitch, ASS_Image *img) {
-    int x, y, k;
-    unsigned char a, Y;
-    unsigned char *sp = img->bitmap;
-
-    a = 255 - _a (img->color);
-    Y = rgba2y (img->color);
-
-    for (y = 0; y < img->h; ++y) {
-        for (x = 0; x < img->w; ++x) {
-            k = (sp[x] * a + 255) >> 8;
-            dsty[x] = (k * Y + (255 - k) * dsty[x] + 255) >> 8;
-        }
-
-        sp += img->stride;
-        dsty += pitch;
-    }
-}
-
-void blit_yv12 (unsigned char *dstu, unsigned char *dstv, unsigned int pitchUV,
-                ASS_Image *img) {
-    int x, y, w, h, x2, nshift, pshift, p1, p2, k;
-    unsigned char a, U, V;
-    unsigned char *sp = img->bitmap;
-
-    a = 255 - _a (img->color);
-    U = rgba2u (img->color);
-    V = rgba2v (img->color);
-
-    w = img->w >> 1;
-    h = img->h >> 1;
-
-    for (y = 0; y < h; ++y) {
-        for (x = 0; x < w; ++x) {
-            x2 = x << 1;
-            // k121 == 1-2-1 kernel, but I apply it on a smaller range than
-            // Avisynth’s Convert so it blurs less, and consequently looks
-            // better with proper chroma upsampling.
-            // Something needs to be done about the image boundaries:
-            // Suppose we have an image less than 2x2 in size.
-            // We’re gonna end up with a near-greyscale image, which is even
-            // worse than the few cut-off borders we’re getting with most
-            // larger images.
-            nshift = x ? 1 : 0;
-            pshift = (x + 1) < w ? 1 : 0;
-
-            if (img->dst_x & (1)) {
-                x2++;
-                nshift++;
-                pshift--;
+        for (i = 0; i < img->h; ++i) {
+            for (j = 0; j < img->w; ++j) {
+                unsigned int k = (src[j] * opacity + 255) >> 8;
+                dsty[j] = (k * y + (255 - k) * dsty[j] + 255) >> 8;
+                dstu[j] = (k * u + (255 - k) * dstu[j] + 255) >> 8;
+                dstv[j] = (k * v + (255 - k) * dstv[j] + 255) >> 8;
             }
 
-            p1 = k121 (sp[x2 - nshift], sp[x2], sp[x2 + pshift]);
+            src  += img->stride;
+            dsty += pitch;
 
-            nshift = y ? img->stride : 0;
-            pshift = (y + 1) < h ? img->stride : 0;
-
-            if (img->dst_y & (1)) {
-                x2 += img->stride;
-                nshift += img->stride;
-                pshift -= img->stride;
-            }
-
-            p2 = k121 (sp[x2 - nshift], sp[x2], sp[x2 + pshift]);
-
-            k = ( ( (p1 + p2) >> 1) * a + 255) >> 8;
-            dstu[x] = (k * U + (255 - k) * dstu[x] + 255) >> 8;
-            dstv[x] = (k * V + (255 - k) * dstv[x] + 255) >> 8;
+            dstu += pitch;
+            dstv += pitch;
         }
 
-        sp += img->stride << 1;
-
-        dstu += pitchUV;
-        dstv += pitchUV;
+        img = img->next;
     }
 }
 
-void blit_yv16 (unsigned char *dstu, unsigned char *dstv, unsigned int pitchUV,
-                ASS_Image *img) {
-    int x, y, w, x2, nshift, pshift, p1, k;
-    unsigned char a, U, V;
-    unsigned char *sp = img->bitmap;
+void setbounds (udata *ud, int starty, int endy,
+                int startx, int endx) {
+    int i;
+    starty >>= 1;
+    endy = (endy + 1) >> 1;
+    startx >>= 1;
+    endx = (endx + 1) >> 1;
 
-    a = 255 - _a (img->color);
-    U = rgba2u (img->color);
-    V = rgba2v (img->color);
+    for (i = starty; i < endy; i++) {
+        struct lbounds *ll = ud->lbounds + i;
 
-    w = img->w >> 1;
+        if (startx < ll->start)
+            ll->start = startx;
 
-    for (y = 0; y < img->h; ++y) {
-        for (x = 0; x < w; ++x) {
-            x2 = x << 1;
-            nshift = x ? 1 : 0;
-            pshift = (x + 1) < w ? 1 : 0;
-
-            if (img->dst_x & (1)) {
-                x2++;
-                nshift++;
-                pshift--;
-            }
-
-            p1 = k121 (sp[x2 - nshift], sp[x2], sp[x2 + pshift]);
-
-            k = (p1 * a + 255) >> 8;
-            dstu[x] = (k * U + (255 - k) * dstu[x] + 255) >> 8;
-            dstv[x] = (k * V + (255 - k) * dstv[x] + 255) >> 8;
-        }
-
-        sp += img->stride;
-        dstu += pitchUV;
-        dstv += pitchUV;
-    }
-}
-
-void blit_yv24 (unsigned char *dstu, unsigned char *dstv, unsigned int pitchUV,
-                ASS_Image *img) {
-    int x, y, k;
-    unsigned char a, U, V;
-    unsigned char *sp = img->bitmap;
-
-    a = 255 - _a (img->color);
-    U = rgba2u (img->color);
-    V = rgba2v (img->color);
-
-    for (y = 0; y < img->h; ++y) {
-        for (x = 0; x < img->w; ++x) {
-            k = (sp[x] * a + 255) >> 8;
-            dstu[x] = (k * U + (255 - k) * dstu[x] + 255) >> 8;
-            dstv[x] = (k * V + (255 - k) * dstv[x] + 255) >> 8;
-        }
-
-        sp += img->stride;
-        dstu += pitchUV;
-        dstv += pitchUV;
+        if (endx > ll->end)
+            ll->end = endx;
     }
 }
 
@@ -456,9 +359,7 @@ AVS_VideoFrame *AVSC_CC assrender_get_frame (AVS_FilterInfo *p, int n) {
     ASS_Image *img;
     AVS_VideoFrame *src;
     unsigned int height, pitch, pitchUV = 0;
-    unsigned char *data, *dataY, *dataU, *dataV;
-    unsigned char *dst, *dsty, *dstu, *dstv;
-    unsigned int dst_delta;
+    unsigned char *data, *dataY = 0, *dataU = 0, *dataV = 0;
     int64_t ts;
 
     src = avs_get_frame (p->child, n);
@@ -489,83 +390,128 @@ AVS_VideoFrame *AVSC_CC assrender_get_frame (AVS_FilterInfo *p, int n) {
     img = ass_render_frame (ass_renderer, ass, ts, NULL);
 
     if (avs_is_rgb32 (&p->vi) || avs_is_rgb24 (&p->vi)) {
-        unsigned int numc = avs_is_rgb32 (&p->vi) ? 4 : 3;
-
-        while (img) {
-            if (img->w == 0 || img->h == 0)
-                continue;
-
-            // Move destination pointer to the bottom right corner of the
-            // bounding box that contains the current overlay bitmap.
-            // Remember that avisynth RGB bitmaps are upside down, hence we
-            // need to render upside down.
-            dst =
-                data + (pitch * (height - img->dst_y - 1)) + img->dst_x * numc;
-            dst_delta = pitch + img->w * numc;
-
-            if (numc == 4) // RGB32
-                blit_rgb32 (dst, img, dst_delta);
-            else // RGB24
-                blit_rgb24 (dst, img, dst_delta);
-
-            img = img->next;
-        }
+        blit_rgb (data, img, pitch, height, avs_is_rgb32 (&p->vi) ? 4 : 3);
     }
     else if (avs_is_yuy2 (&p->vi)) {
-        while (img) {
-            if (img->w == 0 || img->h == 0)
-                continue;
-
-            dst = data + pitch * img->dst_y + img->dst_x * 2;
-
-            blit_yuy2 (dst, img, pitch);
-
-            img = img->next;
-        }
+        // TODO
     }
-    else if (avs_is_yuv ( (&p->vi))) {
-        while (img) {
-            if (img->w == 0 || img->h == 0)
-                continue;
+    else if (avs_is_yuv (&p->vi)) {
 
-            dsty = dataY + pitch * img->dst_y + img->dst_x;
+        if (avs_is_yv12 (&p->vi)) {
+            int i, j;
+            static ASS_Image *im;
+            unsigned char *dstu, *dstv, *srcu, *srcv;
+            unsigned char *dstu_next, *dstv_next, *srcu_next, *srcv_next;
 
-            blit_y (dsty, pitch, img);
-
-            if (avs_is_yv12 (&p->vi)) {
-                dstu = dataU + pitchUV *
-                       ( (img->dst_y + 1) >> 1) + ( (img->dst_x + 1) >> 1);
-                dstv = dataV + pitchUV *
-                       ( (img->dst_y + 1) >> 1) + ( (img->dst_x + 1) >> 1);
-
-                blit_yv12 (dstu, dstv, pitchUV, img);
-            }
-            else {
-                if (pitchUV && pitchUV < pitch) { // probably YV16
-                    dstu =
-                        dataU + pitchUV * img->dst_y + ( (img->dst_x + 1) >> 1);
-                    dstv =
-                        dataV + pitchUV * img->dst_y + ( (img->dst_x + 1) >> 1);
-
-                    blit_yv16 (dstu, dstv, pitchUV, img);
+            if (img) {
+                for (i = 0; i < (height + 1) >> 1; i++) {
+                    ud->lbounds[i].start = 65535;
+                    ud->lbounds[i].end = 0;
                 }
-                else {
-                    if (pitchUV) { // YV24
-                        dstu = dataU + pitchUV * img->dst_y + img->dst_x;
-                        dstv = dataV + pitchUV * img->dst_y + img->dst_x;
 
-                        blit_yv24 (dstu, dstv, pitchUV, img);
-                    }
-                    else { // Y8
-                        // blend luma one more time
-                        dsty = dataY + pitch * img->dst_y + img->dst_x;
+                for (im = img; im; im = im->next)
+                    setbounds (ud, im->dst_y, im->dst_y + im->h,
+                               im->dst_x, im->dst_x + im->w);
 
-                        blit_y (dsty, pitch, img);
+                dstu = ud->uv_tmp[0];
+                dstv = ud->uv_tmp[1];
+                srcu = dataU;
+                srcv = dataV;
+
+                for (i = 0; i < (height + 1) >> 1; i++) {
+                    struct lbounds *lb = ud->lbounds + i;
+                    dstu_next = dstu + pitch;
+                    dstv_next = dstv + pitch;
+
+                    for (j = lb->start; j < lb->end; j++) {
+                        dstu[j << 1]
+                        = dstu[ (j << 1) + 1]
+                        = dstu_next[j << 1]
+                        = dstu_next[ (j << 1) + 1]
+                        = srcu[j];
+
+                        dstv[j << 1]
+                        = dstv[ (j << 1) + 1]
+                        = dstv_next[j << 1]
+                        = dstv_next[ (j << 1) + 1]
+                        = srcv[j];
                     }
+
+                    srcu += pitchUV;
+                    srcv += pitchUV;
+                    dstu = dstu_next + pitch;
+                    dstv = dstv_next + pitch;
+                }
+
+                blit444 (img, dataY, ud->uv_tmp[0], ud->uv_tmp[1], pitch);
+
+                srcu = ud->uv_tmp[0];
+                srcv = ud->uv_tmp[1];
+                srcu_next = srcu + pitch;
+                srcv_next = srcv + pitch;
+                dstu = dataU;
+                dstv = dataV;
+
+                for (i = 0; i < (height + 1) >> 1; ++i) {
+                    for (j = ud->lbounds[i].start;
+                            j < ud->lbounds[i].end; j++) {
+                        dstu[j] = (
+                                      srcu[j << 1]
+                                      + srcu[ (j << 1) + 1]
+                                      + srcu_next[j << 1]
+                                      + srcu_next[ (j << 1) + 1]
+                                  ) >> 2;
+
+                        dstv[j] = (
+                                      srcv[j << 1]
+                                      + srcv[ (j << 1) + 1]
+                                      + srcv_next[j << 1]
+                                      + srcv_next[ (j << 1) + 1]
+                                  ) >> 2;
+                    }
+
+                    dstu += pitchUV;
+                    dstv += pitchUV;
+                    srcu      = srcu_next + pitch;
+                    srcu_next = srcu + pitch;
+                    srcv      = srcv_next + pitch;
+                    srcv_next = srcv + pitch;
                 }
             }
+        }
+        else {
+            if (pitchUV && pitchUV < pitch) { // probably YV16
+                // TODO
+            }
+            else if (pitchUV) // YV24
+                blit444 (img, dataY, dataU, dataV, pitch);
+            else { // Y8
+                while (img) {
+                    unsigned char y = rgba2y (img->color);
+                    unsigned char opacity = 255 - _a (img->color);
 
-            img = img->next;
+                    int i, j;
+
+                    unsigned char *src = img->bitmap;
+                    unsigned char *dsty =
+                        dataY + img->dst_x + img->dst_y * pitch;
+
+                    if (img->w == 0 || img->h == 0)
+                        continue;
+
+                    for (i = 0; i < img->h; ++i) {
+                        for (j = 0; j < img->w; ++j) {
+                            unsigned int k = (src[j] * opacity + 255) >> 8;
+                            dsty[j] = (k * y + (255 - k) * dsty[j] + 255) >> 8;
+                        }
+
+                        src  += img->stride;
+                        dsty += pitch;
+                    }
+
+                    img = img->next;
+                }
+            }
         }
     }
 
@@ -576,6 +522,9 @@ void AVSC_CC assrender_destroy (void *ud, AVS_ScriptEnvironment *env) {
     ass_renderer_done ( ( (udata *) ud)->ass_renderer);
     ass_library_done ( ( (udata *) ud)->ass_library);
     ass_free_track ( ( (udata *) ud)->ass);
+    free ( ( (udata *) ud)->uv_tmp[0]);
+    free ( ( (udata *) ud)->uv_tmp[1]);
+    free ( ( (udata *) ud)->lbounds);
 
     if ( ( (udata *) ud)->isvfr)
         free ( ( (udata *) ud)->timestamp);
@@ -612,8 +561,8 @@ AVS_Value AVSC_CC assrender_create (AVS_ScriptEnvironment *env, AVS_Value args,
                 avs_as_int (avs_array_elt (args, 11)) : 0;
     const char *cs = avs_as_string (avs_array_elt (args, 12)) ?
                      avs_as_string (avs_array_elt (args, 12)) : "UTF-8";
-    int verbosity = avs_is_int (avs_array_elt (args, 13)) ?
-                    avs_as_int (avs_array_elt (args, 13)) : 0;
+    int debuglevel = avs_is_int (avs_array_elt (args, 13)) ?
+                     avs_as_int (avs_array_elt (args, 13)) : 0;
     const char *fontdir = avs_as_string (avs_array_elt (args, 14)) ?
                           avs_as_string (avs_array_elt (args, 14)) : "";
     const char *srt_font = avs_as_string (avs_array_elt (args, 15)) ?
@@ -626,8 +575,8 @@ AVS_Value AVSC_CC assrender_create (AVS_ScriptEnvironment *env, AVS_Value args,
     if (!avs_is_rgb32 (&fi->vi) && !avs_is_rgb24 (&fi->vi) &&
             !avs_is_yv12 (&fi->vi) && !avs_is_yuv (&fi->vi)) {
         v = avs_new_value_error (
-                "AssRender: supported colorspaces: RGB32, RGB24, YV24, YV16, "
-                "YV12, Y8");
+                "AssRender: supported colorspaces: RGB32, RGB24, "
+                "YV24, YV16 (TODO), YV12, Y8");
         avs_release_clip (c);
         return v;
     }
@@ -660,7 +609,7 @@ AVS_Value AVSC_CC assrender_create (AVS_ScriptEnvironment *env, AVS_Value args,
     data = malloc (sizeof (udata));
 
     if (!init_ass (fi->vi.width, fi->vi.height, scale, line_spacing, dar, sar,
-                   top, bottom, left, right, hinting, verbosity, fontdir,
+                   top, bottom, left, right, hinting, debuglevel, fontdir,
                    data)) {
         v = avs_new_value_error ("AssRender: failed to initialize");
         avs_release_clip (c);
@@ -729,6 +678,11 @@ AVS_Value AVSC_CC assrender_create (AVS_ScriptEnvironment *env, AVS_Value args,
         data->isvfr = 0;
     }
 
+    data->uv_tmp[0] = malloc (fi->vi.width * fi->vi.height);
+    data->uv_tmp[1] = malloc (fi->vi.width * fi->vi.height);
+    data->lbounds = malloc ( ( (fi->vi.height + 1) >> 1)
+                             * sizeof ( ( (udata *) ud)->lbounds));
+
     fi->user_data = data;
 
     fi->get_frame = assrender_get_frame;
@@ -745,11 +699,9 @@ const char *AVSC_CC avisynth_c_plugin_init (AVS_ScriptEnvironment *env) {
     avs_add_function (env, "assrender",
                       "c[file]s[vfr]s[hinting]i[scale]f[line_spacing]f[dar]f"
                       "[sar]f[top]i[bottom]i[left]i[right]i[charset]s"
-                      "[verbosity]i[fontdir]s[srt_font]s",
+                      "[debuglevel]i[fontdir]s[srt_font]s",
                       assrender_create, 0);
-    return "AssRender 0.19: draws .asses better and faster than ever before";
+    return "AssRender 0.21: draws .asses better and faster than ever before";
 }
 
 // kate: indent-mode cstyle; space-indent on; indent-width 4; replace-tabs on; 
-
-

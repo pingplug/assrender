@@ -1,7 +1,7 @@
 Usage:
 assrender(clip, string file, [string vfr, int hinting, float scale,
         float line_spacing, float dar, float sar, int top, int bottom, int left,
-        int right, string charset, int verbosity, string fontdir,
+        int right, string charset, int debuglevel, string fontdir,
         string srt_font])
 
 string file:
@@ -23,7 +23,7 @@ string charset:
     Character set to use, in GNU iconv or enca format. Defaults to UTF-8.
     Example enca format: enca:pl:cp1250
         (guess the encoding for Polish, fall back on cp1250)
-int verbosity:
+int debuglevel:
     How much crap assrender is supposed to spam to stderr.
 string fontdir:
     Additional font directory.
