@@ -22,7 +22,6 @@
 #define rgba2u(c)  ( ((-152*_r(c) - 298*_g(c) + 450*_b(c)) >> 10) + 128 )
 #define rgba2v(c)  ( (( 450*_r(c) - 376*_g(c) -  73*_b(c)) >> 10) + 128 )
 
-#define k121(a, b, c)  ((a + b + b + c + 3) >> 2)
 #define blend(srcA, srcRGB, dstA, dstRGB, outA)  \
     (((srcA * 255 * srcRGB + (dstRGB * dstA * (255 - srcA))) / outA + 255) >> 8)
 
@@ -548,7 +547,7 @@ AVS_Value AVSC_CC assrender_create (AVS_ScriptEnvironment *env, AVS_Value args,
     const char *f = avs_as_string (avs_array_elt (args, 1));
     const char *vfr = avs_as_string (avs_array_elt (args, 2));
     int h = avs_is_int (avs_array_elt (args, 3)) ?
-            avs_as_int (avs_array_elt (args, 3)) : 3;
+            avs_as_int (avs_array_elt (args, 3)) : 0;
     double scale = avs_is_float (avs_array_elt (args, 4)) ?
                    avs_as_float (avs_array_elt (args, 4)) : 1.0;
     double line_spacing = avs_is_float (avs_array_elt (args, 5)) ?
@@ -707,7 +706,7 @@ const char *AVSC_CC avisynth_c_plugin_init (AVS_ScriptEnvironment *env) {
                       "[sar]f[top]i[bottom]i[left]i[right]i[charset]s"
                       "[debuglevel]i[fontdir]s[srt_font]s",
                       assrender_create, 0);
-    return "AssRender 0.22: draws .asses better and faster than ever before";
+    return "AssRender 0.23: draws .asses better and faster than ever before";
 }
 
 // kate: indent-mode cstyle; space-indent on; indent-width 4; replace-tabs on; 

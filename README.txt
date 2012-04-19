@@ -10,7 +10,7 @@ string vfr:
     Specify timecodes v1 or v2 file when working with VFRaC.
 int hinting:
     Font hinting mode. Choose between 
-    none (0), light (1), normal (2) and Freetype native (3, default) autohinting.
+    none (0, default), light (1), normal (2) and Freetype native (3) autohinting.
 float scale:
     Font scale. Defaults to 1.0.
 float line_spacing:
