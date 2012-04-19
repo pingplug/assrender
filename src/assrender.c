@@ -8,6 +8,10 @@
 #define _g(c)  (((c)>>16)&0xFF)
 #define _b(c)  (((c)>>8)&0xFF)
 #define _a(c)  ((c)&0xFF)
+// FIXME: bt470bg only? someone explain this shit to me
+#define rgba2y(c)  ( (( 263*_r(c) + 516*_g(c) + 100*_b(c)) >> 10) + 16  )
+#define rgba2u(c)  ( ((-152*_r(c) - 298*_g(c) + 450*_b(c)) >> 10) + 128 )
+#define rgba2v(c)  ( (( 450*_r(c) - 376*_g(c) -  73*_b(c)) >> 10) + 128 )
 
 ASS_Library *ass_library;
 ASS_Renderer *ass_renderer;
@@ -124,17 +128,23 @@ static int init_ass(int w, int h, double scale, ASS_Hinting hinting,
 
 AVS_VideoFrame *AVSC_CC assrender_get_frame(AVS_FilterInfo * p, int n) {
     AVS_VideoFrame *src;
-    int row_size, height, pitch;
-    BYTE *data;
+    int row_size, row_sizeUV, height, heightUV, pitch, pitchUV;
+    BYTE *data, *dataY, *dataU, *dataV;
     int x, y;
 
     src = avs_get_frame(p->child, n);
 
     avs_make_writable(p->env, &src);
+    dataY = avs_get_write_ptr_p(src, AVS_PLANAR_Y);
+    dataU = avs_get_write_ptr_p(src, AVS_PLANAR_U);
+    dataV = avs_get_write_ptr_p(src, AVS_PLANAR_V);
+    pitchUV = avs_get_pitch_p(src, AVS_PLANAR_U);
     data = avs_get_write_ptr(src);
     pitch = avs_get_pitch(src);
     row_size = avs_get_row_size(src);
+    row_sizeUV = avs_get_row_size_p(src, AVS_PLANAR_U_ALIGNED);
     height = avs_get_height(src);
+    heightUV = avs_get_height_p(src, AVS_PLANAR_U);
 
     int64_t ts;
     if (isvfr < 1) {
@@ -152,40 +162,72 @@ AVS_VideoFrame *AVSC_CC assrender_get_frame(AVS_FilterInfo * p, int n) {
         if (img->w == 0 || img->h == 0)
             continue;
 
-        int x, y;
+        register int x, y;
         unsigned char a = 255 - _a(img->color);
-        unsigned char r = _r(img->color);
-        unsigned char g = _g(img->color);
-        unsigned char b = _b(img->color);
 
         unsigned char *src;
-        unsigned char *dst;
-        unsigned char k, ck, t;
-        int dst_delta;
-
+        register unsigned char k;
         src = img->bitmap;
-        dst = data + (pitch * (height - img->dst_y - 1)) + img->dst_x * 4;
-        dst_delta = pitch + img->w * 4;
-        // Move destination pointer to the bottom right corner of the bounding
-        // box that contains the current overlay bitmap.
-        // Remember that avisynth rgb32 bitmaps are upside down, hence we need
-        // to render upside down.
 
-        for (y = 0; y < img->h; y++) {
-            for (x = 0; x < img->w; ++x) {
-                k = ((unsigned)src[x]) * a / 255;
-                ck = 255 - k;
-                t = *dst;
-                *dst++ = (k*b + ck*t) / 255;
-                t = *dst;
-                *dst++ = (k*g + ck*t) / 255;
-                t = *dst;
-                *dst++ = (k*r + ck*t) / 255;
-                dst++;
+        if (avs_is_rgb32(&p->vi)) {
+            unsigned char r = _r(img->color);
+            unsigned char g = _g(img->color);
+            unsigned char b = _b(img->color);
+            unsigned char *dst;
+            int dst_delta;
+            dst = data + (pitch * (height - img->dst_y - 1)) + img->dst_x * 4;
+            dst_delta = pitch + img->w * 4;
+            // Move destination pointer to the bottom right corner of the bounding
+            // box that contains the current overlay bitmap.
+            // Remember that avisynth rgb32 bitmaps are upside down, hence we need
+            // to render upside down.
+
+            for (y = 0; y < img->h; y++) {
+                for (x = 0; x < img->w; ++x) {
+                    unsigned k = (src[x] * a + 255) >> 8;
+                    *dst++ = (k * b + (255 - k) * *dst + 255) >> 8;
+                    *dst++ = (k * g + (255 - k) * *dst + 255) >> 8;
+                    *dst++ = (k * r + (255 - k) * *dst + 255) >> 8;
+                    dst++;
+                }
+                dst -= dst_delta;   // back up a scanline (rendering bottom-to-top)
+                src += img->stride; // advance source one scanline
             }
+        }
+        else if (avs_is_yv12(&p->vi)) {
+            unsigned char Y = rgba2y(img->color);
+            unsigned char U = rgba2u(img->color);
+            unsigned char V = rgba2v(img->color);
+            unsigned char *dsty, *dstu, *dstv;
+            dsty = dataY + pitch * img->dst_y + img->dst_x;
+            dstu = dataU + pitchUV * (img->dst_y / 2) + (img->dst_x / 2);
+            dstv = dataV + pitchUV * (img->dst_y / 2) + (img->dst_x / 2);
 
-            dst -= dst_delta;   // back up a scanline (rendering bottom-to-top)
-            src += img->stride; // advance source one scanline
+            for (y = 0; y < img->h; ++y) {
+                for (x = 0; x < img->w; ++x) {
+                    unsigned k = (src[x] * a + 255) >> 8;
+                    dsty[x] = (k * Y + (255 - k) * dsty[x] + 255) >> 8;
+                }
+                src += img->stride;
+                dsty += pitch;
+            }
+            src = img->bitmap;
+            // FIXME needs better chroma subsampling
+            //       I hate myself for not being better at this
+            int w = ceil((double)img->w/2.0);
+            int h = ceil((double)img->h/2.0);
+            for (y = 0; y < h; ++y) {
+                for (x = 0; x < w; ++x) {
+                    unsigned k = (src[x * 2] * a + 255) >> 8;
+                    if (x) // average alpha so it looks less like total crap
+                        k = rint((k + ((src[(x * 2) - 1] * a + 255) >> 8)) / 2.0);
+                    dstu[x] = (k * U + (255 - k) * dstu[x] + 255) >> 8;
+                    dstv[x] = (k * V + (255 - k) * dstv[x] + 255) >> 8;
+                }
+                src += img->stride * 2;
+                dstu += pitchUV;
+                dstv += pitchUV;
+            }
         }
 
         img = img->next;
@@ -199,8 +241,8 @@ AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment *env, AVS_Value args,
     AVS_FilterInfo * fi;
     AVS_Clip *c = avs_new_c_filter(env, &fi, avs_array_elt(args, 0), 1);
     char e[250];
-    if (!avs_is_rgb32(&fi->vi)) {
-        v = avs_new_value_error("AssRender: Only RGB32 is supported!");
+    if (!avs_is_rgb32(&fi->vi) && !avs_is_yv12(&fi->vi)) {
+        v = avs_new_value_error("AssRender: supported colorspaces: RGB32, YV12");
         avs_release_clip(c);
         return v;
     }
@@ -303,6 +345,7 @@ const char *AVSC_CC avisynth_c_plugin_init(AVS_ScriptEnvironment *env) {
     avs_add_function(env, "assrender",
                      "c[file]s[hinting]i[scale]f[charset]s[verbosity]i[vfr]s",
                      assrender_create, 0);
-    return "AssRender 0.16: draws .asses better and faster than ever before";
+    return "AssRender 0.17: draws .asses better and faster than ever before";
 }
+
 
