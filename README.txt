@@ -20,9 +20,11 @@ float dar, float sar:
 int top, int bottom, int left, int right:
     Margins. They will be added to the frame size and may be negative.
 string charset:
-    Character set to use, in GNU iconv format. Defaults to UTF-8.
+    Character set to use, in GNU iconv or enca format. Defaults to UTF-8.
+    Example enca format: enca:pl:cp1250
+        (guess the encoding for Polish, fall back on cp1250)
 int verbosity:
-    How much crap assrender is supposed to spam to stdout.
+    How much crap assrender is supposed to spam to stderr.
 string fontdir:
     Additional font directory.
     Useful if you are lazy but want to keep your system fonts clean.
