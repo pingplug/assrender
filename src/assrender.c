@@ -706,7 +706,7 @@ const char *AVSC_CC avisynth_c_plugin_init (AVS_ScriptEnvironment *env) {
                       "[sar]f[top]i[bottom]i[left]i[right]i[charset]s"
                       "[debuglevel]i[fontdir]s[srt_font]s",
                       assrender_create, 0);
-    return "AssRender 0.23: draws .asses better and faster than ever before";
+    return "AssRender 0.24.1: draws .asses better and faster than ever before";
 }
 
 // kate: indent-mode cstyle; space-indent on; indent-width 4; replace-tabs on; 
