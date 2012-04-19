@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
+SET(CMAKE_C_FLAGS "-O3 --std=gnu99")
 project(assrender)
 link_directories(${ASSRENDER_BINARY_DIR})
 add_library(assrender SHARED assrender.c)
-target_link_libraries(assrender -Wl,--gc-sections -Wl,-whole-archive fontconfig freetype iconv enca z m ass -Wl,-no-whole-archive avisynth.lib)
+target_link_libraries(assrender -Wl,--gc-sections ass fontconfig freetype iconv z avisynth.lib)
