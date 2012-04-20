@@ -4,6 +4,25 @@
 
 #include "assrender.h"
 
+void ass_read_colorspace(const char *f, char *csp) {
+    char buf[BUFSIZ];
+    FILE *fh = fopen(f, "r");
+
+    if (!fh)
+        return;
+
+    while (fgets(buf, BUFSIZ - 1, fh) != NULL) {
+        if (buf[0] == 0 || buf[0] == '\n' || buf[0] == '\r')
+            continue;
+
+        if (sscanf(buf, "Video Colorspace: %s", csp) == 1)
+            break;
+
+        if (!strcmp(buf, "[Events]"))
+            break;
+    }
+}
+
 ASS_Track *parse_srt(const char *f, udata *ud, const char *srt_font)
 {
     char l[BUFSIZ], buf[BUFSIZ];

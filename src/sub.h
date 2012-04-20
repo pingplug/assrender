@@ -1,3 +1,5 @@
+void ass_read_colorspace(const char *f, char *csp);
+
 ASS_Track *parse_srt(const char *f, udata *ud, const char *srt_font);
 
 void msg_callback(int level, const char *fmt, va_list va, void *data);

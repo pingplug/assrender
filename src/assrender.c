@@ -60,6 +60,9 @@ AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment *env, AVS_Value args,
     const char *colorspace = avs_as_string(avs_array_elt(args, 16)) ?
                              avs_as_string(avs_array_elt(args, 16)) : "guess";
 
+    char *tmpcsp = calloc(1, BUFSIZ);
+    memcpy(tmpcsp, colorspace, BUFSIZ - 1);
+
     ASS_Hinting hinting;
     udata *data;
     ASS_Track *ass;
@@ -110,8 +113,10 @@ AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment *env, AVS_Value args,
 
     if (!strcasecmp(strrchr(f, '.'), ".srt"))
         ass = parse_srt(f, data, srt_font);
-    else
+    else {
         ass = ass_read_file(data->ass_library, (char *) f, (char *) cs);
+        ass_read_colorspace(f, tmpcsp);
+    }
 
     if (!ass) {
         sprintf(e, "AssRender: unable to parse '%s'", f);
@@ -169,15 +174,18 @@ AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment *env, AVS_Value args,
         data->isvfr = 0;
     }
 
-    if (!strcasecmp(colorspace, "guess") || !strcasecmp(colorspace, "auto")) {
+    if (!strcasecmp(tmpcsp, "bt.709") || !strcasecmp(tmpcsp,"rec709"))
+        data->colorspace = BT709;
+    else if (!strcasecmp(tmpcsp, "bt.601") || !strcasecmp(tmpcsp, "rec601"))
+        data->colorspace = BT601;
+    else {
         if (fi->vi.width > 1280 || fi->vi.height > 576)
             data->colorspace = BT709;
         else
             data->colorspace = BT601;
-    } else if (!strcasecmp(colorspace, "bt.709") || !strcasecmp(colorspace,"rec709"))
-        data->colorspace = BT709;
-    else if (!strcasecmp(colorspace, "bt.601") || !strcasecmp(colorspace, "rec601"))
-        data->colorspace = BT601;
+    }
+
+    free(tmpcsp);
 
     data->uv_tmp[0] = malloc(fi->vi.width * fi->vi.height);
     data->uv_tmp[1] = malloc(fi->vi.width * fi->vi.height);
