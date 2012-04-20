@@ -1,8 +1,16 @@
+AssRender is an AviSynth plugin that renders ASS/SSA and SRT (without the
+HTML-like markup) subtitles. It uses libass to render the subtitles, which makes
+it the fastest and most correct ASS renderer for AviSynth.
+
+This also means that it is much more picky about script syntax than VSFilter
+and friends, so keep that in mind before blaming the filter. Yes, people have
+reported a lot of errors that were actually the script author’s fault.
+
 Usage:
 assrender(clip, string file, [string vfr, int hinting, float scale,
         float line_spacing, float dar, float sar, int top, int bottom, int left,
         int right, string charset, int debuglevel, string fontdir,
-        string srt_font])
+        string srt_font, string colorspace])
 
 string file:
     Your subtitle file. May be ASS, SSA or SRT.
@@ -31,3 +39,8 @@ string fontdir:
 string srt_font:
     Font to use for SRT subtitles.
     Defaults to whatever Fontconfig chooses for “Sans”.
+string colorspace:
+    The color space of your (YUV) video. Possible values:
+        - auto, guess (guess based on video resolution)
+        - Rec709, BT.709
+        - Rec601, BT.601
