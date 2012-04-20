@@ -1,9 +1,17 @@
-set(CMAKE_BUILD_TYPE Release)
-
-SET(CMAKE_C_FLAGS " ${CMAKE_C_FLAGS} -O3 -Wall -pedantic -std=gnu89")
-
 cmake_minimum_required(VERSION 2.8)
+
 project(assrender)
-link_directories(${ASSRENDER_BINARY_DIR})
+
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBASS REQUIRED libass>=0.10.0)
+find_package(EXPAT REQUIRED)
+find_package(ZLIB REQUIRED)
+
+if (CMAKE_COMPILER_IS_GNUCXX)
+    add_definitions("-Wall -pedantic -std=gnu89")
+    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "-s")
+    set(CMAKE_C_FLAGS_RELEASE "-O3")
+endif()
+
 add_library(assrender SHARED assrender.c)
-target_link_libraries(assrender -s -Wl,--gc-sections ass enca fontconfig expat harfbuzz fribidi glib-2.0 intl freetype iconv z avisynth.lib)
+target_link_libraries(assrender ${LIBASS_LDFLAGS} ${EXPAT_LIBRARY} ${ZLIB_LIBRARY} avisynth.lib)
