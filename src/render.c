@@ -200,15 +200,15 @@ AVS_VideoFrame *AVSC_CC assrender_get_frame(AVS_FilterInfo *p, int n)
                     for (j = lb->start; j < lb->end; j++) {
                         dstu[j << 1]
                         = dstu[(j << 1) + 1]
-                          = dstu_next[j << 1]
-                            = dstu_next[(j << 1) + 1]
-                              = srcu[j];
+                        = dstu_next[j << 1]
+                        = dstu_next[(j << 1) + 1]
+                        = srcu[j];
 
                         dstv[j << 1]
                         = dstv[(j << 1) + 1]
-                          = dstv_next[j << 1]
-                            = dstv_next[(j << 1) + 1]
-                              = srcv[j];
+                        = dstv_next[j << 1]
+                        = dstv_next[(j << 1) + 1]
+                        = srcv[j];
                     }
 
                     srcu += pitchUV;
