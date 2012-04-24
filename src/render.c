@@ -93,8 +93,8 @@ void blit444(ASS_Image *img, uint8_t *dataY, uint8_t *dataU, uint8_t *dataV,
             v = rgba2v709(img->color);
         } else {
             y = rgba2y601(img->color);
-            u = rgba2y601(img->color);
-            v = rgba2y601(img->color);
+            u = rgba2u601(img->color);
+            v = rgba2v601(img->color);
         }
 
         opacity = 255 - _a(img->color);
