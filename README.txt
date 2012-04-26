@@ -38,7 +38,7 @@ string fontdir:
     Useful if you are lazy but want to keep your system fonts clean.
 string srt_font:
     Font to use for SRT subtitles.
-    Defaults to whatever Fontconfig chooses for “Sans”.
+    Defaults to whatever Fontconfig chooses for “sans-serif”.
 string colorspace:
     The color space of your (YUV) video. Possible values:
         - Rec709, BT.709
