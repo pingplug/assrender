@@ -21,6 +21,8 @@ void ass_read_colorspace(const char *f, char *csp) {
         if (!strcmp(buf, "[Events]"))
             break;
     }
+
+    fclose(fh);
 }
 
 ASS_Track *parse_srt(const char *f, udata *ud, const char *srt_font)
@@ -72,6 +74,8 @@ ASS_Track *parse_srt(const char *f, udata *ud, const char *srt_font)
             ass_process_data(ass, buf, BUFSIZ - 1);
         }
     }
+
+    fclose(fh);
 
     return ass;
 }

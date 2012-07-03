@@ -36,8 +36,6 @@ int parse_timecodesv1(FILE *f, int total, udata *ud)
         }
     }
 
-    fclose(f);
-
     if (basefps == 0.0) {
         free(ts);
         return 0;
@@ -69,8 +67,6 @@ int parse_timecodesv2(FILE *f, int total, udata *ud)
 
         ts[n++] = atoll(l);
     }
-
-    fclose(f);
 
     if (n < total) {
         free(ts);

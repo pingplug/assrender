@@ -170,6 +170,8 @@ AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment *env, AVS_Value args,
 
             break;
         }
+
+        fclose(fh);
     } else {
         data->isvfr = 0;
     }
@@ -211,7 +213,7 @@ const char *AVSC_CC avisynth_c_plugin_init(AVS_ScriptEnvironment *env)
                      "[sar]f[top]i[bottom]i[left]i[right]i[charset]s"
                      "[debuglevel]i[fontdir]s[srt_font]s[colorspace]s",
                      assrender_create, 0);
-    return "AssRender 0.25: draws .asses better and faster than ever before";
+    return "AssRender 0.26: draws .asses better and faster than ever before";
 }
 
 // kate: indent-mode cstyle; space-indent on; indent-width 4; replace-tabs on;
