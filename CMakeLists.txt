@@ -1,16 +1,12 @@
-cmake_minimum_required(VERSION 2.8)
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
+PROJECT(assrender)
 
-project(assrender)
+ADD_SUBDIRECTORY(src)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LIBASS REQUIRED libass>=0.10.0)
-find_package(EXPAT REQUIRED)
-find_package(ZLIB REQUIRED)
+IF(MINGW)
+    SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libgcc -Wl,--add-stdcall-alias")
+    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -Wpedantic")
+    SET(CMAKE_SHARED_LINKER_FLAGS_RELEASE "-s")
+    SET(CMAKE_C_FLAGS_RELEASE "-O3")
+ENDIF()
 
-if (CMAKE_COMPILER_IS_GNUCXX)
-    add_definitions("-Wall -Wno-comment -pedantic -std=gnu99")
-    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "-s")
-    set(CMAKE_C_FLAGS_RELEASE "-O3")
-endif()
-
-add_subdirectory(src)
