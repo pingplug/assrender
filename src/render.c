@@ -1,4 +1,3 @@
-#include "assrender.h"
 #include "render.h"
 
 void setbounds(udata *ud, int starty, int endy, int startx, int endx)

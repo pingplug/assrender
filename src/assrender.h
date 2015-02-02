@@ -1,5 +1,11 @@
-#include <ass/ass.h>
+#ifndef _ASSRENDER_H_
+#define _ASSRENDER_H_
+
+#include <stdlib.h>
 #include <stdint.h>
+#include <math.h>
+#include <string.h>
+#include <ass/ass.h>
 #include "avisynth_c.h"
 
 #if defined(_MSC_VER)
@@ -38,3 +44,5 @@ typedef struct {
     int64_t *timestamp;
     enum csp colorspace;
 } udata;
+
+#endif

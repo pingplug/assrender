@@ -1,8 +1,4 @@
-#include <fontconfig/fontconfig.h>
-#include <math.h>
-#include <string.h>
-
-#include "assrender.h"
+#include "sub.h"
 
 void ass_read_colorspace(const char *f, char *csp) {
     char buf[BUFSIZ];

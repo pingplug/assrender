@@ -1,6 +1,4 @@
-#include <math.h>
-#include <stdlib.h>
-#include "assrender.h"
+#include "timecodes.h"
 
 int parse_timecodesv1(FILE *f, int total, udata *ud)
 {

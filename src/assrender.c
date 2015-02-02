@@ -1,6 +1,3 @@
-#include <stdlib.h>
-#include <string.h>
-
 #include "assrender.h"
 #include "render.h"
 #include "sub.h"
@@ -215,5 +212,3 @@ const char *AVSC_CC avisynth_c_plugin_init(AVS_ScriptEnvironment *env)
                      assrender_create, 0);
     return "AssRender 0.26: draws .asses better and faster than ever before";
 }
-
-// kate: indent-mode cstyle; space-indent on; indent-width 4; replace-tabs on;

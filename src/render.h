@@ -1,3 +1,8 @@
+#ifndef _RENDER_H_
+#define _RENDER_H_
+
+#include "assrender.h"
+
 #define _r(c)  ((c)>>24)
 #define _g(c)  (((c)>>16)&0xFF)
 #define _b(c)  (((c)>>8)&0xFF)
@@ -14,12 +19,6 @@
 #define blend(srcA, srcRGB, dstA, dstRGB, outA)  \
     (((srcA * 255 * srcRGB + (dstRGB * dstA * (255 - srcA))) / outA + 255) >> 8)
 
-void setbounds(udata *ud, int starty, int endy, int startx, int endx);
+AVS_VideoFrame* AVSC_CC assrender_get_frame(AVS_FilterInfo* p, int n);
 
-void blit_rgb(uint8_t *data, ASS_Image *img, uint32_t pitch, uint32_t height,
-              uint32_t numc);
-
-void blit444(ASS_Image *img, uint8_t *dataY, uint8_t *dataU, uint8_t *dataV,
-             uint32_t pitch, enum csp colorspace);
-
-AVS_VideoFrame *AVSC_CC assrender_get_frame(AVS_FilterInfo *p, int n);
+#endif
