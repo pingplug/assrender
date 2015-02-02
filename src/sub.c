@@ -95,7 +95,6 @@ int init_ass(int w, int h, double scale, double line_spacing,
              int bottom, int left, int right, int verbosity,
              const char *fontdir, udata *ud)
 {
-    extern int FcDebugVal;
     ASS_Renderer *ass_renderer;
     ASS_Library *ass_library = ass_library_init();
 
@@ -123,19 +122,10 @@ int init_ass(int w, int h, double scale, double line_spacing,
     if (dar && sar)
         ass_set_aspect_ratio(ass_renderer, dar, sar);
 
-    if (verbosity > 0) {
-        // update Fontconfig’s cache verbosely
-        FcDebugVal = 128;
-    }
-
-    // don’t scan for home directory as it’s not needed on win32
-    FcConfigEnableHome(FcFalse);
-
     if (strcmp(fontdir, ""))
         ass_set_fonts_dir(ass_library, fontdir);
 
     ass_set_fonts(ass_renderer, NULL, NULL, 1, NULL, 1);
-    FcDebugVal = 0;
     ud->ass_library = ass_library;
     ud->ass_renderer = ass_renderer;
 

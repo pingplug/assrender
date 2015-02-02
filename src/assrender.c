@@ -54,7 +54,7 @@ AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment *env, AVS_Value args,
     int debuglevel = avs_is_int(avs_array_elt(args, 13)) ?
                      avs_as_int(avs_array_elt(args, 13)) : 0;
     const char *fontdir = avs_as_string(avs_array_elt(args, 14)) ?
-                          avs_as_string(avs_array_elt(args, 14)) : "";
+                          avs_as_string(avs_array_elt(args, 14)) : "C:/Windows/Fonts";
     const char *srt_font = avs_as_string(avs_array_elt(args, 15)) ?
                            avs_as_string(avs_array_elt(args, 15)) : "sans-serif";
     const char *colorspace = avs_as_string(avs_array_elt(args, 16)) ?
