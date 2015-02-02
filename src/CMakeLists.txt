@@ -7,6 +7,7 @@ SET(ASSRender_SRC
     sub.h
     timecodes.c
     timecodes.h
+    ASSRender.rc
     )
 
 FIND_PACKAGE(PkgConfig REQUIRED)
