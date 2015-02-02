@@ -23,11 +23,7 @@ enum csp {
 };
 
 typedef struct {
-    uint8_t* uv_tmp[2];
-    struct lbounds {
-        uint16_t start;
-        uint16_t end;
-    }*lbounds;
+    uint8_t* sub_img[4];
     uint32_t isvfr;
     ASS_Track* ass;
     ASS_Library* ass_library;

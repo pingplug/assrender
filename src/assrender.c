@@ -9,9 +9,10 @@ void AVSC_CC assrender_destroy(void* ud, AVS_ScriptEnvironment* env)
     ass_library_done(((udata*)ud)->ass_library);
     ass_free_track(((udata*)ud)->ass);
 
-    free(((udata*)ud)->uv_tmp[0]);
-    free(((udata*)ud)->uv_tmp[1]);
-    free(((udata*)ud)->lbounds);
+    free(((udata*)ud)->sub_img[0]);
+    free(((udata*)ud)->sub_img[1]);
+    free(((udata*)ud)->sub_img[2]);
+    free(((udata*)ud)->sub_img[3]);
 
     if (((udata*)ud)->isvfr)
         free(((udata*)ud)->timestamp);
@@ -68,7 +69,7 @@ AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment* env, AVS_Value args,
     if (!avs_is_rgb32(&fi->vi) && !avs_is_rgb24(&fi->vi) && !avs_is_yv12(&fi->vi) && !avs_is_yuv(&fi->vi)) {
         v = avs_new_value_error(
                 "AssRender: supported colorspaces: RGB32, RGB24, "
-                "YV24, YV16 (TODO), YV12, Y8");
+                "YUY2, YV24, YV16, YV12, Y8");
         avs_release_clip(c);
         return v;
     }
@@ -190,10 +191,10 @@ AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment* env, AVS_Value args,
 
     free(tmpcsp);
 
-    data->uv_tmp[0] = malloc(fi->vi.width * fi->vi.height);
-    data->uv_tmp[1] = malloc(fi->vi.width * fi->vi.height);
-    data->lbounds = malloc(((fi->vi.height + 1) >> 1)
-                           * sizeof(((udata *) ud)->lbounds));
+    data->sub_img[0] = malloc(fi->vi.width * fi->vi.height);
+    data->sub_img[1] = malloc(fi->vi.width * fi->vi.height);
+    data->sub_img[2] = malloc(fi->vi.width * fi->vi.height);
+    data->sub_img[3] = malloc(fi->vi.width * fi->vi.height);
 
     fi->user_data = data;
 
@@ -214,5 +215,5 @@ const char* AVSC_CC avisynth_c_plugin_init(AVS_ScriptEnvironment* env)
                      "[sar]f[top]i[bottom]i[left]i[right]i[charset]s"
                      "[debuglevel]i[fontdir]s[srt_font]s[colorspace]s",
                      assrender_create, 0);
-    return "AssRender 0.26: draws .asses better and faster than ever before";
+    return "AssRender 0.27: draws text subtitles better and faster than ever before";
 }

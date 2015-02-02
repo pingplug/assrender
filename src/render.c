@@ -1,90 +1,70 @@
 #include "render.h"
 
-void setbounds(udata* ud, int starty, int endy, int startx, int endx)
+void make_sub_img_rgb(ASS_Image* img, uint8_t** sub_img, uint32_t width)
 {
-    int i;
-    starty >>= 1;
-    endy = (endy + 1) >> 1;
-    startx >>= 1;
-    endx = (endx + 1) >> 1;
+    uint8_t r, g, b, a, a1, *src, *dstR, *dstG, *dstB, *dstA;
+    uint32_t i, j, dsta;
 
-    for (i = starty; i < endy; i++) {
-        struct lbounds* ll = ud->lbounds + i;
-
-        if (startx < ll->start)
-            ll->start = startx;
-
-        if (endx > ll->end)
-            ll->end = endx;
-    }
-}
-
-void blit_rgb(uint8_t* data, ASS_Image* img, uint32_t pitch, uint32_t height,
-              uint32_t numc)
-{
     while (img) {
-        uint8_t* dst;
-        uint32_t dst_delta;
-        int x, y, k, c = 0;
-        uint8_t a, r, g, b;
-        uint8_t outa;
-        uint8_t* sp = img->bitmap;
-
         if (img->w == 0 || img->h == 0) {
             img = img->next;
             continue;
         }
 
-        // Move destination pointer to the bottom right corner of the
-        // bounding box that contains the current overlay bitmap.
-        // Remember that avisynth RGB bitmaps are upside down, hence we
-        // need to render upside down.
-        dst =
-            data + (pitch * (height - img->dst_y - 1)) + img->dst_x * numc;
-        dst_delta = pitch + img->w * numc;
-
-        a = 255 - _a(img->color);
         r = _r(img->color);
         g = _g(img->color);
         b = _b(img->color);
+        a1 = 255 - _a(img->color);
 
+        src = img->bitmap;
+        dstR = sub_img[1] + img->dst_y * width + img->dst_x;
+        dstG = sub_img[2] + img->dst_y * width + img->dst_x;
+        dstB = sub_img[3] + img->dst_y * width + img->dst_x;
+        dstA = sub_img[0] + img->dst_y * width + img->dst_x;
 
-        for (y = 0; y < img->h; y++) {
-            for (x = 0; x < img->w; ++x) {
-                k = div255(sp[x] * a);
-
-                if (k && numc == 4) {
-                    outa = scale(k, 255, dst[c + 3]);
-                    dst[c    ] = dblend(k, b, dst[c + 3], dst[c    ], outa);
-                    dst[c + 1] = dblend(k, g, dst[c + 3], dst[c + 1], outa);
-                    dst[c + 2] = dblend(k, r, dst[c + 3], dst[c + 2], outa);
-                    dst[c + 3] = div255(outa);
-                } else {
-                    dst[c    ] = blend(k, b, dst[c    ]);
-                    dst[c + 1] = blend(k, g, dst[c + 1]);
-                    dst[c + 2] = blend(k, r, dst[c + 2]);
+        for (i = 0; i < img->h; i++) {
+            for (j = 0; j < img->w; j++) {
+                a = div255(src[j] * a1);
+                if (a) {
+                    if (dstA[j]) {
+                        dsta = scale(a, 255, dstA[j]);
+                        dstR[j] = dblend(a, r, dstA[j], dstR[j], dsta);
+                        dstG[j] = dblend(a, g, dstA[j], dstG[j], dsta);
+                        dstB[j] = dblend(a, b, dstA[j], dstB[j], dsta);
+                        dstA[j] = div255(dsta);
+                    } else {
+                        dstR[j] = r;
+                        dstG[j] = g;
+                        dstB[j] = b;
+                        dstA[j] = a;
+                    }
+                    if (dstB[j] < 10 && dstR[j] < 10 && dstG[j] > 200)
+                        fprintf(stderr, "%d %d  ", a, src[j]);
                 }
-
-                c += numc;
             }
 
-            dst -= dst_delta;
-            sp += img->stride;
+            src += img->stride;
+            dstR += width;
+            dstG += width;
+            dstB += width;
+            dstA += width;
         }
 
         img = img->next;
     }
 }
 
-void blit444(ASS_Image* img, uint8_t* dataY, uint8_t* dataU, uint8_t* dataV,
-             uint32_t pitch, enum csp colorspace)
+void make_sub_img_yuv(ASS_Image* img, uint8_t** sub_img, uint32_t width, enum csp colorspace)
 {
-    uint8_t y, u, v, opacity, *src, *dsty, *dstu, *dstv;
-    uint32_t k;
-
-    int i, j;
+    uint8_t y, u, v, a, a1, *src, *dstY, *dstU, *dstV, *dstA;
+    uint32_t i, j, dsta;
 
     while (img) {
+        if (img->w == 0 || img->h == 0) {
+            img = img->next;
+            continue;
+        }
+
         if (colorspace == BT709) {
             y = rgb2y709(img->color);
             u = rgb2u709(img->color);
@@ -99,34 +79,405 @@ void blit444(ASS_Image* img, uint8_t* dataY, uint8_t* dataU, uint8_t* dataV,
             v = rgb2v2020(img->color);
         }
 
-        opacity = 255 - _a(img->color);
+        a1 = 255 - _a(img->color);
 
         src = img->bitmap;
-        dsty = dataY + img->dst_x + img->dst_y * pitch;
-        dstu = dataU + img->dst_x + img->dst_y * pitch;
-        dstv = dataV + img->dst_x + img->dst_y * pitch;
+        dstY = sub_img[1] + img->dst_y * width + img->dst_x;
+        dstU = sub_img[2] + img->dst_y * width + img->dst_x;
+        dstV = sub_img[3] + img->dst_y * width + img->dst_x;
+        dstA = sub_img[0] + img->dst_y * width + img->dst_x;
 
+        for (i = 0; i < img->h; i++) {
+            for (j = 0; j < img->w; j++) {
+                a = div255(src[j] * a1);
+                if (a) {
+                    if (dstA[j]) {
+                        dsta = scale(a, 255, dstA[j]);
+                        dstY[j] = dblend(a, y, dstA[j], dstY[j], dsta);
+                        dstU[j] = dblend(a, u, dstA[j], dstU[j], dsta);
+                        dstV[j] = dblend(a, v, dstA[j], dstV[j], dsta);
+                        dstA[j] = div255(dsta);
+                    } else {
+                        dstY[j] = y;
+                        dstU[j] = u;
+                        dstV[j] = v;
+                        dstA[j] = a;
+                    }
+                }
+            }
+
+            src += img->stride;
+            dstY += width;
+            dstU += width;
+            dstV += width;
+            dstA += width;
+        }
+
+        img = img->next;
+    }
+}
+
+void make_sub_img_y(ASS_Image* img, uint8_t** sub_img, uint32_t width, enum csp colorspace)
+{
+    uint8_t y, a, a1, *src, *dstY, *dstA;
+    uint32_t i, j, dsta;
+
+    while (img) {
         if (img->w == 0 || img->h == 0) {
             img = img->next;
             continue;
         }
 
-        for (i = 0; i < img->h; ++i) {
-            for (j = 0; j < img->w; ++j) {
-                k = div255(src[j] * opacity);
-                dsty[j] = blend(k, y, dsty[j]);
-                dstu[j] = blend(k, u, dstu[j]);
-                dstv[j] = blend(k, v, dstv[j]);
+        if (colorspace == BT709) {
+            y = rgb2y709(img->color);
+        } else if (colorspace == BT601) {
+            y = rgb2y601(img->color);
+        } else {
+            y = rgb2y2020(img->color);
+        }
+
+        a1 = 255 - _a(img->color);
+
+        src = img->bitmap;
+        dstY = sub_img[1] + img->dst_y * width + img->dst_x;
+        dstA = sub_img[0] + img->dst_y * width + img->dst_x;
+
+        for (i = 0; i < img->h; i++) {
+            for (j = 0; j < img->w; j++) {
+                a = div255(src[j] * a1);
+                if (a) {
+                    if (dstA[j]) {
+                        dsta = scale(a, 255, dstA[j]);
+                        dstY[j] = dblend(a, y, dstA[j], dstY[j], dsta);
+                        dstA[j] = div255(dsta);
+                    } else {
+                        dstY[j] = y;
+                        dstA[j] = a;
+                    }
+                }
             }
 
-            src  += img->stride;
-            dsty += pitch;
-
-            dstu += pitch;
-            dstv += pitch;
+            src += img->stride;
+            dstY += width;
+            dstA += width;
         }
 
         img = img->next;
+    }
+}
+
+void apply_rgba(uint8_t** sub_img, uint8_t* data, uint32_t pitch, uint32_t width, uint32_t height)
+{
+    uint8_t *srcA, *srcR, *srcG, *srcB, *dstA, *dstR, *dstG, *dstB;
+    uint32_t i, j, k, dsta;
+
+    srcR = sub_img[1];
+    srcG = sub_img[2];
+    srcB = sub_img[3];
+    srcA = sub_img[0];
+
+    // Move destination pointer to the bottom right corner of the
+    // bounding box that contains the current overlay bitmap.
+    // Remember that avisynth RGB bitmaps are upside down, hence we
+    // need to render upside down.
+    dstB = data + pitch * (height - 1);
+    dstG = dstB + 1;
+    dstR = dstB + 2;
+    dstA = dstB + 3;
+
+    for (i = 0; i < height; i++) {
+        for (j = 0; j < width; j++) {
+            if (srcA[j]) {
+                k = j * 4;
+                dsta = scale(srcA[j], 255, dstA[k]);
+                dstR[k] = dblend(srcA[j], srcR[j], dstA[k], dstR[k], dsta);
+                dstG[k] = dblend(srcA[j], srcG[j], dstA[k], dstG[k], dsta);
+                dstB[k] = dblend(srcA[j], srcB[j], dstA[k], dstB[k], dsta);
+                dstA[k] = div255(dsta);
+            }
+        }
+
+        srcR += width;
+        srcG += width;
+        srcB += width;
+        srcA += width;
+        dstR -= pitch;
+        dstG -= pitch;
+        dstB -= pitch;
+        dstA -= pitch;
+    }
+}
+
+void apply_rgb(uint8_t** sub_img, uint8_t* data, uint32_t pitch, uint32_t width, uint32_t height)
+{
+    uint8_t *srcR, *srcG, *srcB, *srcA, *dstR, *dstG, *dstB;
+    uint32_t i, j, k;
+
+    srcR = sub_img[1];
+    srcG = sub_img[2];
+    srcB = sub_img[3];
+    srcA = sub_img[0];
+
+    // Move destination pointer to the bottom right corner of the
+    // bounding box that contains the current overlay bitmap.
+    // Remember that avisynth RGB bitmaps are upside down, hence we
+    // need to render upside down.
+    dstB = data + pitch * (height - 1);
+    dstG = dstB + 1;
+    dstR = dstB + 2;
+
+    for (i = 0; i < height; i++) {
+        for (j = 0; j < width; j++) {
+            if (srcA[j]) {
+                k = j * 3;
+                dstR[k] = blend(srcA[j], srcR[j], dstR[k]);
+                dstG[k] = blend(srcA[j], srcG[j], dstG[k]);
+                dstB[k] = blend(srcA[j], srcB[j], dstB[k]);
+            }
+        }
+
+        srcR += width;
+        srcG += width;
+        srcB += width;
+        srcA += width;
+        dstR -= pitch;
+        dstG -= pitch;
+        dstB -= pitch;
+    }
+}
+
+void apply_yuy2(uint8_t** sub_img, uint8_t* data, uint32_t pitch, uint32_t width, uint32_t height)
+{
+    uint8_t *srcY0, *srcY1, *srcU0, *srcU1, *srcV0, *srcV1, *srcA0, *srcA1;
+    uint8_t *dstY0, *dstU, *dstY1, *dstV;
+    uint32_t i, j, k;
+
+    srcY0 = sub_img[1];
+    srcY1 = sub_img[1] + 1;
+    srcU0 = sub_img[2];
+    srcU1 = sub_img[2] + 1;
+    srcV0 = sub_img[3];
+    srcV1 = sub_img[3] + 1;
+    srcA0 = sub_img[0];
+    srcA1 = sub_img[0] + 1;
+
+    // YUYV
+    dstY0 = data;
+    dstU  = data + 1;
+    dstY1 = data + 2;
+    dstV  = data + 3;
+
+    for (i = 0; i < height; i++) {
+        for (j = 0; j < width; j += 2) {
+            if (srcA0[j] + srcA1[j]) {
+                k = j * 2;
+                dstY0[k] =  blend(srcA0[j], srcY0[j], dstY0[k]);
+                dstY1[k] =  blend(srcA1[j], srcY1[j], dstY1[k]);
+                dstU[k]  = blend2(srcA0[j], srcU0[j],
+                                  srcA1[j], srcU1[j], dstU[k]);
+                dstV[k]  = blend2(srcA0[j], srcV0[j],
+                                  srcA1[j], srcV1[j], dstV[k]);
+            }
+        }
+
+        srcY0 += width;
+        srcY1 += width;
+        srcU0 += width;
+        srcU1 += width;
+        srcV0 += width;
+        srcV1 += width;
+        srcA0 += width;
+        srcA1 += width;
+        dstY0 += pitch;
+        dstU  += pitch;
+        dstY1 += pitch;
+        dstV  += pitch;
+    }
+}
+
+void apply_yv12(uint8_t** sub_img, uint8_t* dataY, uint8_t* dataU, uint8_t* dataV,
+                uint32_t pitchY, uint32_t pitchUV, uint32_t width, uint32_t height)
+{
+    uint8_t *srcY00, *srcU00, *srcV00, *srcA00;
+    uint8_t *srcY01, *srcU01, *srcV01, *srcA01;
+    uint8_t *srcY10, *srcU10, *srcV10, *srcA10;
+    uint8_t *srcY11, *srcU11, *srcV11, *srcA11;
+    uint8_t *dstY00, *dstY01, *dstY10, *dstY11, *dstU, *dstV;
+    uint32_t i, j, k;
+
+    srcY00 = sub_img[1];
+    srcY01 = sub_img[1] + 1;
+    srcY10 = sub_img[1] + width;
+    srcY11 = sub_img[1] + width + 1;
+    srcU00 = sub_img[2];
+    srcU01 = sub_img[2] + 1;
+    srcU10 = sub_img[2] + width;
+    srcU11 = sub_img[2] + width + 1;
+    srcV00 = sub_img[3];
+    srcV01 = sub_img[3] + 1;
+    srcV10 = sub_img[3] + width;
+    srcV11 = sub_img[3] + width + 1;
+    srcA00 = sub_img[0];
+    srcA01 = sub_img[0] + 1;
+    srcA10 = sub_img[0] + width;
+    srcA11 = sub_img[0] + width + 1;
+
+    dstY00 = dataY;
+    dstY01 = dataY + 1;
+    dstY10 = dataY + pitchY;
+    dstY11 = dataY + pitchY + 1;
+    dstU   = dataU;
+    dstV   = dataV;
+
+    for (i = 0; i < height; i += 2) {
+        for (j = 0; j < width; j += 2) {
+            k = j >> 1;
+            if (srcA00[j] + srcA01[j] + srcA10[j] + srcA11[j]) {
+                dstY00[j] =  blend(srcA00[j], srcY00[j], dstY00[j]);
+                dstY01[j] =  blend(srcA01[j], srcY01[j], dstY01[j]);
+                dstY10[j] =  blend(srcA10[j], srcY10[j], dstY10[j]);
+                dstY11[j] =  blend(srcA11[j], srcY11[j], dstY11[j]);
+                dstU[k]   = blend4(srcA00[j], srcU00[j],
+                                   srcA01[j], srcU01[j],
+                                   srcA10[j], srcU10[j],
+                                   srcA11[j], srcU11[j], dstU[k]);
+                dstV[k]   = blend4(srcA00[j], srcV00[j],
+                                   srcA01[j], srcV01[j],
+                                   srcA10[j], srcV10[j],
+                                   srcA11[j], srcV11[j], dstV[k]);
+            }
+        }
+
+        srcY00 += width * 2;
+        srcY01 += width * 2;
+        srcY10 += width * 2;
+        srcY11 += width * 2;
+        srcU00 += width * 2;
+        srcU01 += width * 2;
+        srcU10 += width * 2;
+        srcU11 += width * 2;
+        srcV00 += width * 2;
+        srcV01 += width * 2;
+        srcV10 += width * 2;
+        srcV11 += width * 2;
+        srcA00 += width * 2;
+        srcA01 += width * 2;
+        srcA10 += width * 2;
+        srcA11 += width * 2;
+        dstY00 += pitchY * 2;
+        dstY01 += pitchY * 2;
+        dstY10 += pitchY * 2;
+        dstY11 += pitchY * 2;
+        dstU   += pitchUV;
+        dstV   += pitchUV;
+    }
+}
+
+void apply_yv16(uint8_t** sub_img, uint8_t* dataY, uint8_t* dataU, uint8_t* dataV,
+                uint32_t pitchY, uint32_t pitchUV, uint32_t width, uint32_t height)
+{
+    uint8_t *srcY0, *srcY1, *srcU0, *srcU1, *srcV0, *srcV1, *srcA0, *srcA1;
+    uint8_t *dstY0, *dstU, *dstY1, *dstV;
+    uint32_t i, j, k;
+
+    srcY0 = sub_img[1];
+    srcY1 = sub_img[1] + 1;
+    srcU0 = sub_img[2];
+    srcU1 = sub_img[2] + 1;
+    srcV0 = sub_img[3];
+    srcV1 = sub_img[3] + 1;
+    srcA0 = sub_img[0];
+    srcA1 = sub_img[0] + 1;
+
+    // YUYV
+    dstY0 = dataY;
+    dstU  = dataU;
+    dstY1 = dataY + 1;
+    dstV  = dataV;
+
+    for (i = 0; i < height; i++) {
+        for (j = 0; j < width; j += 2) {
+            k = j >> 1;
+            if (srcA0[j] + srcA1[j]) {
+                dstY0[j] =  blend(srcA0[j], srcY0[j], dstY0[j]);
+                dstY1[j] =  blend(srcA1[j], srcY1[j], dstY1[j]);
+                dstU[k]  = blend2(srcA0[j], srcU0[j],
+                                  srcA1[j], srcU1[j], dstU[k]);
+                dstV[k]  = blend2(srcA0[j], srcV0[j],
+                                  srcA1[j], srcV1[j], dstV[k]);
+            }
+        }
+
+        srcY0 += width;
+        srcY1 += width;
+        srcU0 += width;
+        srcU1 += width;
+        srcV0 += width;
+        srcV1 += width;
+        srcA0 += width;
+        srcA1 += width;
+        dstY0 += pitchY;
+        dstY1 += pitchY;
+        dstU  += pitchUV;
+        dstV  += pitchUV;
+    }
+}
+
+void apply_yv24(uint8_t** sub_img, uint8_t* dataY, uint8_t* dataU, uint8_t* dataV,
+                uint32_t pitch, uint32_t width, uint32_t height)
+{
+    uint8_t *srcY, *srcU, *srcV, *srcA, *dstY, *dstU, *dstV;
+    uint32_t i, j;
+
+    srcY = sub_img[1];
+    srcU = sub_img[2];
+    srcV = sub_img[3];
+    srcA = sub_img[0];
+
+    dstY = dataY;
+    dstU = dataU;
+    dstV = dataV;
+
+    for (i = 0; i < height; i++) {
+        for (j = 0; j < width; j++) {
+            if (srcA[j]) {
+                dstY[j] = blend(srcA[j], srcY[j], dstY[j]);
+                dstU[j] = blend(srcA[j], srcU[j], dstU[j]);
+                dstV[j] = blend(srcA[j], srcV[j], dstV[j]);
+            }
+        }
+
+        srcY += width;
+        srcU += width;
+        srcV += width;
+        srcA += width;
+        dstY += pitch;
+        dstU += pitch;
+        dstV += pitch;
+    }
+}
+
+void apply_y8(uint8_t** sub_img, uint8_t* dataY, uint32_t pitch, uint32_t width,
+              uint32_t height)
+{
+    uint8_t *srcY, *srcA, *dstY;
+    uint32_t i, j;
+
+    srcY = sub_img[1];
+    srcA = sub_img[0];
+
+    dstY = dataY;
+
+    for (i = 0; i < height; i++) {
+        for (j = 0; j < width; j++) {
+            if (srcA[j]) {
+                dstY[j] = blend(srcA[j], srcY[j], dstY[j]);
+            }
+        }
+
+        srcY += width;
+        srcA += width;
+        dstY += pitch;
     }
 }
 
@@ -137,9 +488,10 @@ AVS_VideoFrame* AVSC_CC assrender_get_frame(AVS_FilterInfo* p, int n)
     ASS_Renderer* ass_renderer = ud->ass_renderer;
     ASS_Image* img;
     AVS_VideoFrame* src;
-    uint32_t height, pitch, pitchUV = 0;
+    uint32_t height, heightUV = 0, width, pitch, pitchUV = 0;
     uint8_t *data, *dataY = 0, *dataU = 0, *dataV = 0;
     int64_t ts;
+    int changed;
 
     src = avs_get_frame(p->child, n);
 
@@ -150,150 +502,75 @@ AVS_VideoFrame* AVSC_CC assrender_get_frame(AVS_FilterInfo* p, int n)
         dataU = avs_get_write_ptr_p(src, AVS_PLANAR_U);
         dataV = avs_get_write_ptr_p(src, AVS_PLANAR_V);
         pitchUV = avs_get_pitch_p(src, AVS_PLANAR_U);
+        heightUV = avs_get_height_p(src, AVS_PLANAR_U);
     }
 
     data = avs_get_write_ptr(src);
 
-    height = avs_get_height(src);
+    height = p->vi.height;
+    width = p->vi.width;
     pitch = avs_get_pitch(src);
 
     if (!ud->isvfr) {
         // it’s a casting party!
-        ts = (int64_t)n * (int64_t)1000 * (int64_t)p->vi.fps_denominator /
-             (int64_t)p->vi.fps_numerator;
+        ts = (int64_t)n * (int64_t)1000 * (int64_t)p->vi.fps_denominator / (int64_t)p->vi.fps_numerator;
     } else {
         ts = ud->timestamp[n];
     }
 
-    img = ass_render_frame(ass_renderer, ass, ts, NULL);
+    img = ass_render_frame(ass_renderer, ass, ts, &changed);
 
     if (img) {
         if (avs_is_rgb32(&p->vi)) { // RGBA
-            blit_rgb(data, img, pitch, height, 4);
+            if (changed) {
+                memset(ud->sub_img[0], 0x00, height * width);
+                make_sub_img_rgb(img, ud->sub_img, width);
+            }
+
+            apply_rgba(ud->sub_img, data, pitch, width, height);
         } else if (avs_is_rgb24(&p->vi)) { // RGB
-            blit_rgb(data, img, pitch, height, 3);
+            if (changed) {
+                memset(ud->sub_img[0], 0x00, height * width);
+                make_sub_img_rgb(img, ud->sub_img, width);
+            }
+
+            apply_rgb(ud->sub_img, data, pitch, width, height);
         } else if (avs_is_yuy2(&p->vi)) { // YUY2
-            // TODO
+            if (changed) {
+                memset(ud->sub_img[0], 0x00, height * width);
+                make_sub_img_yuv(img, ud->sub_img, width, ud->colorspace);
+            }
+
+            apply_yuy2(ud->sub_img, data, pitch, width, height);
         } else if (avs_is_planar(&p->vi)) {
             if (heightUV && heightUV < height) { // YV12
-                int i, j;
-                static ASS_Image* im;
-                uint8_t *dstu, *dstv, *srcu, *srcv;
-                uint8_t *dstu_next, *dstv_next, *srcu_next, *srcv_next;
-
-                if (img) {
-                    for (i = 0; i < (height + 1) >> 1; i++) {
-                        ud->lbounds[i].start = 65535;
-                        ud->lbounds[i].end = 0;
-                    }
-
-                    for (im = img; im; im = im->next)
-                        setbounds(ud, im->dst_y, im->dst_y + im->h, im->dst_x, im->dst_x + im->w);
-
-                    dstu = ud->uv_tmp[0];
-                    dstv = ud->uv_tmp[1];
-                    srcu = dataU;
-                    srcv = dataV;
-
-                    for (i = 0; i < (height + 1) >> 1; i++) {
-                        struct lbounds* lb = ud->lbounds + i;
-                        dstu_next = dstu + pitch;
-                        dstv_next = dstv + pitch;
-
-                        for (j = lb->start; j < lb->end; j++) {
-                            dstu[j << 1]
-                            = dstu[(j << 1) + 1]
-                            = dstu_next[j << 1]
-                            = dstu_next[(j << 1) + 1]
-                            = srcu[j];
-
-                            dstv[j << 1]
-                            = dstv[(j << 1) + 1]
-                            = dstv_next[j << 1]
-                            = dstv_next[(j << 1) + 1]
-                            = srcv[j];
-                        }
-
-                        srcu += pitchUV;
-                        srcv += pitchUV;
-                        dstu = dstu_next + pitch;
-                        dstv = dstv_next + pitch;
-                    }
-
-                    blit444(img, dataY, ud->uv_tmp[0], ud->uv_tmp[1], pitch, ud->colorspace);
-
-                    srcu = ud->uv_tmp[0];
-                    srcv = ud->uv_tmp[1];
-                    srcu_next = srcu + pitch;
-                    srcv_next = srcv + pitch;
-                    dstu = dataU;
-                    dstv = dataV;
-
-                    for (i = 0; i < (height + 1) >> 1; ++i) {
-                        for (j = ud->lbounds[i].start; j < ud->lbounds[i].end; j++) {
-                            dstu[j] = (
-                                        srcu[j << 1]
-                                        + srcu[(j << 1) + 1]
-                                        + srcu_next[j << 1]
-                                        + srcu_next[(j << 1) + 1]
-                                      ) >> 2;
-
-                            dstv[j] = (
-                                        srcv[j << 1]
-                                        + srcv[(j << 1) + 1]
-                                        + srcv_next[j << 1]
-                                        + srcv_next[(j << 1) + 1]
-                                      ) >> 2;
-                        }
-
-                        dstu += pitchUV;
-                        dstv += pitchUV;
-                        srcu      = srcu_next + pitch;
-                        srcu_next = srcu + pitch;
-                        srcv      = srcv_next + pitch;
-                        srcv_next = srcv + pitch;
-                    }
+                if (changed) {
+                    memset(ud->sub_img[0], 0x00, height * width);
+                    make_sub_img_yuv(img, ud->sub_img, width, ud->colorspace);
                 }
+
+                apply_yv12(ud->sub_img, dataY, dataU, dataV, pitch, pitchUV, width, height);
             } else if (pitchUV && pitchUV < pitch) { // YV16
-                // TODO
-            } else if (pitchUV == pitch) { // YV24
-                blit444(img, dataY, dataU, dataV, pitch, ud->colorspace);
-            } else { // Y8
-                while (img) {
-                    uint8_t y;
-
-                    if (ud->colorspace == BT709) {
-                        y = rgb2y709(img->color);
-                    } else if (ud->colorspace == BT601) {
-                        y = rgb2y601(img->color);
-                    } else {
-                        y = rgb2y2020(img->color);
-                    }
-
-                    uint8_t opacity = 255 - _a(img->color);
-
-                    int i, j;
-
-                    uint8_t* src = img->bitmap;
-                    uint8_t* dsty = dataY + img->dst_x + img->dst_y * pitch;
-
-                    if (img->w == 0 || img->h == 0) {
-                        img = img->next;
-                        continue;
-                    }
-
-                    for (i = 0; i < img->h; ++i) {
-                        for (j = 0; j < img->w; ++j) {
-                            uint32_t k = div255(src[j] * opacity);
-                            dsty[j] = blend(k, y, dsty[j]);
-                        }
-
-                        src  += img->stride;
-                        dsty += pitch;
-                    }
-
-                    img = img->next;
+                if (changed) {
+                    memset(ud->sub_img[0], 0x00, height * width);
+                    make_sub_img_yuv(img, ud->sub_img, width, ud->colorspace);
                 }
+
+                apply_yv16(ud->sub_img, dataY, dataU, dataV, pitch, pitchUV, width, height);
+            } else if (pitchUV == pitch) { // YV24
+                if (changed) {
+                    memset(ud->sub_img[0], 0x00, height * width);
+                    make_sub_img_yuv(img, ud->sub_img, width, ud->colorspace);
+                }
+
+                apply_yv24(ud->sub_img, dataY, dataU, dataV, pitch, width, height);
+            } else { // Y8
+                if (changed) {
+                    memset(ud->sub_img[0], 0x00, height * width);
+                    make_sub_img_y(img, ud->sub_img, width, ud->colorspace);
+                }
+
+                apply_y8(ud->sub_img, dataY, pitch, width, height);
             }
         }
     }

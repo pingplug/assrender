@@ -27,6 +27,10 @@
 
 #define blend(srcA, srcC, dstC) \
     ((div255(srcA * srcC + (255 - srcA) * dstC)))
+#define blend2(src1A, src1C, src2A, src2C, dstC) \
+    ((div255(((src1A * src1C + src2A * src2C + (510 - src1A - src2A) * dstC + 1) >> 1))))
+#define blend4(src1A, src1C, src2A, src2C, src3A, src3C, src4A, src4C, dstC) \
+    ((div255(((src1A * src1C + src2A * src2C + src3A * src3C + src4A * src4C + (1020 - src1A - src2A - src3A - src4A) * dstC + 2) >> 2))))
 #define scale(srcA, srcC, dstC) \
     ((srcA * srcC + (255 - srcA) * dstC))
 #define dblend(srcA, srcC, dstA, dstC, outA) \
