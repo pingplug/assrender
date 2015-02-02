@@ -3,31 +3,32 @@
 #include "sub.h"
 #include "timecodes.h"
 
-void AVSC_CC assrender_destroy(void *ud, AVS_ScriptEnvironment *env)
+void AVSC_CC assrender_destroy(void* ud, AVS_ScriptEnvironment* env)
 {
-    ass_renderer_done(((udata *) ud)->ass_renderer);
-    ass_library_done(((udata *) ud)->ass_library);
-    ass_free_track(((udata *) ud)->ass);
-    free(((udata *) ud)->uv_tmp[0]);
-    free(((udata *) ud)->uv_tmp[1]);
-    free(((udata *) ud)->lbounds);
+    ass_renderer_done(((udata*)ud)->ass_renderer);
+    ass_library_done(((udata*)ud)->ass_library);
+    ass_free_track(((udata*)ud)->ass);
 
-    if (((udata *) ud)->isvfr)
-        free(((udata *) ud)->timestamp);
+    free(((udata*)ud)->uv_tmp[0]);
+    free(((udata*)ud)->uv_tmp[1]);
+    free(((udata*)ud)->lbounds);
+
+    if (((udata*)ud)->isvfr)
+        free(((udata*)ud)->timestamp);
 
     free(ud);
 }
 
-AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment *env, AVS_Value args,
-                                   void *ud)
+AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment* env, AVS_Value args,
+                                   void* ud)
 {
     AVS_Value v;
-    AVS_FilterInfo *fi;
-    AVS_Clip *c = avs_new_c_filter(env, &fi, avs_array_elt(args, 0), 1);
+    AVS_FilterInfo* fi;
+    AVS_Clip* c = avs_new_c_filter(env, &fi, avs_array_elt(args, 0), 1);
     char e[250];
 
-    const char *f = avs_as_string(avs_array_elt(args, 1));
-    const char *vfr = avs_as_string(avs_array_elt(args, 2));
+    const char* f = avs_as_string(avs_array_elt(args, 1));
+    const char* vfr = avs_as_string(avs_array_elt(args, 2));
     int h = avs_is_int(avs_array_elt(args, 3)) ?
             avs_as_int(avs_array_elt(args, 3)) : 0;
     double scale = avs_is_float(avs_array_elt(args, 4)) ?
@@ -46,26 +47,25 @@ AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment *env, AVS_Value args,
                avs_as_int(avs_array_elt(args, 10)) : 0;
     int right = avs_is_int(avs_array_elt(args, 11)) ?
                 avs_as_int(avs_array_elt(args, 11)) : 0;
-    const char *cs = avs_as_string(avs_array_elt(args, 12)) ?
+    const char* cs = avs_as_string(avs_array_elt(args, 12)) ?
                      avs_as_string(avs_array_elt(args, 12)) : "UTF-8";
     int debuglevel = avs_is_int(avs_array_elt(args, 13)) ?
                      avs_as_int(avs_array_elt(args, 13)) : 0;
-    const char *fontdir = avs_as_string(avs_array_elt(args, 14)) ?
+    const char* fontdir = avs_as_string(avs_array_elt(args, 14)) ?
                           avs_as_string(avs_array_elt(args, 14)) : "C:/Windows/Fonts";
-    const char *srt_font = avs_as_string(avs_array_elt(args, 15)) ?
+    const char* srt_font = avs_as_string(avs_array_elt(args, 15)) ?
                            avs_as_string(avs_array_elt(args, 15)) : "sans-serif";
-    const char *colorspace = avs_as_string(avs_array_elt(args, 16)) ?
+    const char* colorspace = avs_as_string(avs_array_elt(args, 16)) ?
                              avs_as_string(avs_array_elt(args, 16)) : "guess";
 
-    char *tmpcsp = calloc(1, BUFSIZ);
+    char* tmpcsp = calloc(1, BUFSIZ);
     memcpy(tmpcsp, colorspace, BUFSIZ - 1);
 
     ASS_Hinting hinting;
-    udata *data;
-    ASS_Track *ass;
+    udata* data;
+    ASS_Track* ass;
 
-    if (!avs_is_rgb32(&fi->vi) && !avs_is_rgb24(&fi->vi) &&
-            !avs_is_yv12(&fi->vi) && !avs_is_yuv(&fi->vi)) {
+    if (!avs_is_rgb32(&fi->vi) && !avs_is_rgb24(&fi->vi) && !avs_is_yv12(&fi->vi) && !avs_is_yuv(&fi->vi)) {
         v = avs_new_value_error(
                 "AssRender: supported colorspaces: RGB32, RGB24, "
                 "YV24, YV16 (TODO), YV12, Y8");
@@ -111,7 +111,7 @@ AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment *env, AVS_Value args,
     if (!strcasecmp(strrchr(f, '.'), ".srt"))
         ass = parse_srt(f, data, srt_font);
     else {
-        ass = ass_read_file(data->ass_library, (char *) f, (char *) cs);
+        ass = ass_read_file(data->ass_library, (char*)f, (char*)cs);
         ass_read_colorspace(f, tmpcsp);
     }
 
@@ -126,7 +126,7 @@ AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment *env, AVS_Value args,
 
     if (vfr) {
         int ver;
-        FILE *fh = fopen(vfr, "r");
+        FILE* fh = fopen(vfr, "r");
 
         if (!fh) {
             sprintf(e, "AssRender: could not read timecodes file '%s'", vfr);
@@ -173,7 +173,7 @@ AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment *env, AVS_Value args,
         data->isvfr = 0;
     }
 
-    if (!strcasecmp(tmpcsp, "bt.709") || !strcasecmp(tmpcsp,"rec709"))
+    if (!strcasecmp(tmpcsp, "bt.709") || !strcasecmp(tmpcsp, "rec709"))
         data->colorspace = BT709;
     else if (!strcasecmp(tmpcsp, "bt.601") || !strcasecmp(tmpcsp, "rec601"))
         data->colorspace = BT601;
@@ -203,7 +203,7 @@ AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment *env, AVS_Value args,
     return v;
 }
 
-const char *AVSC_CC avisynth_c_plugin_init(AVS_ScriptEnvironment *env)
+const char* AVSC_CC avisynth_c_plugin_init(AVS_ScriptEnvironment* env)
 {
     avs_add_function(env, "assrender",
                      "c[file]s[vfr]s[hinting]i[scale]f[line_spacing]f[dar]f"

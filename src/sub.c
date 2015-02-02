@@ -1,8 +1,8 @@
 #include "sub.h"
 
-void ass_read_colorspace(const char *f, char *csp) {
+void ass_read_colorspace(const char* f, char* csp) {
     char buf[BUFSIZ];
-    FILE *fh = fopen(f, "r");
+    FILE* fh = fopen(f, "r");
 
     if (!fh)
         return;
@@ -21,12 +21,12 @@ void ass_read_colorspace(const char *f, char *csp) {
     fclose(fh);
 }
 
-ASS_Track *parse_srt(const char *f, udata *ud, const char *srt_font)
+ASS_Track* parse_srt(const char* f, udata* ud, const char* srt_font)
 {
     char l[BUFSIZ], buf[BUFSIZ];
     int start[4], end[4], isn;
-    ASS_Track *ass = ass_new_track(ud->ass_library);
-    FILE *fh = fopen(f, "r");
+    ASS_Track* ass = ass_new_track(ud->ass_library);
+    FILE* fh = fopen(f, "r");
 
     if (!fh)
         return NULL;
@@ -48,8 +48,8 @@ ASS_Track *parse_srt(const char *f, udata *ud, const char *srt_font)
             sprintf(buf, "Dialogue: 0,%d:%02d:%02d.%02d,%d:%02d:%02d.%02d,"
                     "Default,,0,0,0,,{\\blur0.7}",
                     start[0], start[1], start[2],
-                    (int) ((double) start[3] / 10.0 + 0.5), end[0], end[1],
-                    end[2], (int) ((double) end[3] / 10.0 + 0.5));
+                    (int)((double)start[3] / 10.0 + 0.5), end[0], end[1],
+                    end[2], (int)((double)end[3] / 10.0 + 0.5));
             isn = 0;
 
             while (fgets(l, BUFSIZ - 1, fh) != NULL) {
@@ -76,9 +76,9 @@ ASS_Track *parse_srt(const char *f, udata *ud, const char *srt_font)
     return ass;
 }
 
-void msg_callback(int level, const char *fmt, va_list va, void *data)
+void msg_callback(int level, const char* fmt, va_list va, void* data)
 {
-    if (level > (int) data)
+    if (level > (int)data)
         return;
 
     fprintf(stderr, "libass: ");
@@ -89,15 +89,15 @@ void msg_callback(int level, const char *fmt, va_list va, void *data)
 int init_ass(int w, int h, double scale, double line_spacing,
              ASS_Hinting hinting, double dar, double sar, int top,
              int bottom, int left, int right, int verbosity,
-             const char *fontdir, udata *ud)
+             const char* fontdir, udata* ud)
 {
-    ASS_Renderer *ass_renderer;
-    ASS_Library *ass_library = ass_library_init();
+    ASS_Renderer* ass_renderer;
+    ASS_Library* ass_library = ass_library_init();
 
     if (!ass_library)
         return 0;
 
-    ass_set_message_cb(ass_library, msg_callback, (void *) verbosity);
+    ass_set_message_cb(ass_library, msg_callback, (void*)verbosity);
     ass_set_extract_fonts(ass_library, 0);
     ass_set_style_overrides(ass_library, 0);
 

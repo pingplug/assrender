@@ -1,6 +1,6 @@
 #include "render.h"
 
-void setbounds(udata *ud, int starty, int endy, int startx, int endx)
+void setbounds(udata* ud, int starty, int endy, int startx, int endx)
 {
     int i;
     starty >>= 1;
@@ -9,7 +9,7 @@ void setbounds(udata *ud, int starty, int endy, int startx, int endx)
     endx = (endx + 1) >> 1;
 
     for (i = starty; i < endy; i++) {
-        struct lbounds *ll = ud->lbounds + i;
+        struct lbounds* ll = ud->lbounds + i;
 
         if (startx < ll->start)
             ll->start = startx;
@@ -19,16 +19,16 @@ void setbounds(udata *ud, int starty, int endy, int startx, int endx)
     }
 }
 
-void blit_rgb(uint8_t *data, ASS_Image *img, uint32_t pitch, uint32_t height,
+void blit_rgb(uint8_t* data, ASS_Image* img, uint32_t pitch, uint32_t height,
               uint32_t numc)
 {
     while (img) {
-        uint8_t *dst;
+        uint8_t* dst;
         uint32_t dst_delta;
         int x, y, k, c = 0;
         uint8_t a, r, g, b;
         uint8_t outa;
-        uint8_t *sp = img->bitmap;
+        uint8_t* sp = img->bitmap;
 
         if (img->w == 0 || img->h == 0) {
             img = img->next;
@@ -76,7 +76,7 @@ void blit_rgb(uint8_t *data, ASS_Image *img, uint32_t pitch, uint32_t height,
     }
 }
 
-void blit444(ASS_Image *img, uint8_t *dataY, uint8_t *dataU, uint8_t *dataV,
+void blit444(ASS_Image* img, uint8_t* dataY, uint8_t* dataU, uint8_t* dataV,
              uint32_t pitch, enum csp colorspace)
 {
     uint8_t y, u, v, opacity, *src, *dsty, *dstu, *dstv;
@@ -126,13 +126,13 @@ void blit444(ASS_Image *img, uint8_t *dataY, uint8_t *dataU, uint8_t *dataV,
     }
 }
 
-AVS_VideoFrame *AVSC_CC assrender_get_frame(AVS_FilterInfo *p, int n)
+AVS_VideoFrame* AVSC_CC assrender_get_frame(AVS_FilterInfo* p, int n)
 {
-    udata *ud = (udata *) p->user_data;
-    ASS_Track *ass = ud->ass;
-    ASS_Renderer *ass_renderer = ud->ass_renderer;
-    ASS_Image *img;
-    AVS_VideoFrame *src;
+    udata* ud = (udata*)p->user_data;
+    ASS_Track* ass = ud->ass;
+    ASS_Renderer* ass_renderer = ud->ass_renderer;
+    ASS_Image* img;
+    AVS_VideoFrame* src;
     uint32_t height, pitch, pitchUV = 0;
     uint8_t *data, *dataY = 0, *dataU = 0, *dataV = 0;
     int64_t ts;
@@ -155,8 +155,8 @@ AVS_VideoFrame *AVSC_CC assrender_get_frame(AVS_FilterInfo *p, int n)
 
     if (!ud->isvfr) {
         // it’s a casting party!
-        ts = (int64_t) n * (int64_t) 1000 * (int64_t) p->vi.fps_denominator /
-             (int64_t) p->vi.fps_numerator;
+        ts = (int64_t)n * (int64_t)1000 * (int64_t)p->vi.fps_denominator /
+             (int64_t)p->vi.fps_numerator;
     } else {
         ts = ud->timestamp[n];
     }
@@ -171,7 +171,7 @@ AVS_VideoFrame *AVSC_CC assrender_get_frame(AVS_FilterInfo *p, int n)
 
         if (avs_is_yv12(&p->vi)) {
             int i, j;
-            static ASS_Image *im;
+            static ASS_Image* im;
             uint8_t *dstu, *dstv, *srcu, *srcv;
             uint8_t *dstu_next, *dstv_next, *srcu_next, *srcv_next;
 
@@ -191,7 +191,7 @@ AVS_VideoFrame *AVSC_CC assrender_get_frame(AVS_FilterInfo *p, int n)
                 srcv = dataV;
 
                 for (i = 0; i < (height + 1) >> 1; i++) {
-                    struct lbounds *lb = ud->lbounds + i;
+                    struct lbounds* lb = ud->lbounds + i;
                     dstu_next = dstu + pitch;
                     dstv_next = dstv + pitch;
 
@@ -270,8 +270,8 @@ AVS_VideoFrame *AVSC_CC assrender_get_frame(AVS_FilterInfo *p, int n)
 
                     int i, j;
 
-                    uint8_t *src = img->bitmap;
-                    uint8_t *dsty = dataY + img->dst_x + img->dst_y * pitch;
+                    uint8_t* src = img->bitmap;
+                    uint8_t* dsty = dataY + img->dst_x + img->dst_y * pitch;
 
                     if (img->w == 0 || img->h == 0) {
                         img = img->next;

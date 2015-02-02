@@ -24,16 +24,16 @@ enum csp {
 enum plane { Y, U, V };
 
 typedef struct {
-    uint8_t *uv_tmp[2];
+    uint8_t* uv_tmp[2];
     struct lbounds {
         uint16_t start;
         uint16_t end;
-    } *lbounds;
+    }*lbounds;
     uint32_t isvfr;
-    ASS_Track *ass;
-    ASS_Library *ass_library;
-    ASS_Renderer *ass_renderer;
-    int64_t *timestamp;
+    ASS_Track* ass;
+    ASS_Library* ass_library;
+    ASS_Renderer* ass_renderer;
+    int64_t* timestamp;
     enum csp colorspace;
 } udata;
 

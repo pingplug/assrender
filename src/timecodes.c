@@ -1,11 +1,11 @@
 #include "timecodes.h"
 
-int parse_timecodesv1(FILE *f, int total, udata *ud)
+int parse_timecodesv1(FILE* f, int total, udata* ud)
 {
     int start, end, n = 0;
     double t = 0.0, basefps = 0.0, fps;
     char l[BUFSIZ];
-    int64_t *ts = calloc(total, sizeof(int64_t));
+    int64_t* ts = calloc(total, sizeof(int64_t));
 
     if (!ts)
         return 0;
@@ -24,12 +24,12 @@ int parse_timecodesv1(FILE *f, int total, udata *ud)
             continue;
 
         while (n < start && n < total) {
-            ts[n++] = (int64_t) (t + 0.5);
+            ts[n++] = (int64_t)(t + 0.5);
             t += 1000.0 / basefps;
         }
 
         while (n <= end && n < total) {
-            ts[n++] = (int64_t) (t + 0.5);
+            ts[n++] = (int64_t)(t + 0.5);
             t += 1000.0 / fps;
         }
     }
@@ -40,7 +40,7 @@ int parse_timecodesv1(FILE *f, int total, udata *ud)
     }
 
     while (n < total) {
-        ts[n++] = (int64_t) (t + 0.5);
+        ts[n++] = (int64_t)(t + 0.5);
         t += 1000.0 / basefps;
     }
 
@@ -49,10 +49,10 @@ int parse_timecodesv1(FILE *f, int total, udata *ud)
     return 1;
 }
 
-int parse_timecodesv2(FILE *f, int total, udata *ud)
+int parse_timecodesv2(FILE* f, int total, udata* ud)
 {
     int n = 0;
-    int64_t *ts = calloc(total, sizeof(int64_t));
+    int64_t* ts = calloc(total, sizeof(int64_t));
     char l[BUFSIZ];
 
     if (!ts) {
