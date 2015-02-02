@@ -48,8 +48,8 @@ ASS_Track *parse_srt(const char *f, udata *ud, const char *srt_font)
             sprintf(buf, "Dialogue: 0,%d:%02d:%02d.%02d,%d:%02d:%02d.%02d,"
                     "Default,,0,0,0,,{\\blur0.7}",
                     start[0], start[1], start[2],
-                    (int) rint((double) start[3] / 10.0), end[0], end[1],
-                    end[2], (int) rint((double) end[3] / 10.0));
+                    (int) ((double) start[3] / 10.0 + 0.5), end[0], end[1],
+                    end[2], (int) ((double) end[3] / 10.0 + 0.5));
             isn = 0;
 
             while (fgets(l, BUFSIZ - 1, fh) != NULL) {

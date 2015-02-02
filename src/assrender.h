@@ -11,14 +11,6 @@
 #if defined(_MSC_VER)
 #define __NO_ISOCEXT
 #define __NO_INLINE__
-#endif
-
-#if defined(_WIN32) && !defined(__MINGW32__)
-// replacement of POSIX rint() for Windows
-static int rint(double x)
-{
-    return floor(x + .5);
-}
 
 #define strcasecmp _stricmp
 #define atoll _atoi64

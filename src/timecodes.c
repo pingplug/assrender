@@ -24,12 +24,12 @@ int parse_timecodesv1(FILE *f, int total, udata *ud)
             continue;
 
         while (n < start && n < total) {
-            ts[n++] = (int64_t) rint(t);
+            ts[n++] = (int64_t) (t + 0.5);
             t += 1000.0 / basefps;
         }
 
         while (n <= end && n < total) {
-            ts[n++] = (int64_t) rint(t);
+            ts[n++] = (int64_t) (t + 0.5);
             t += 1000.0 / fps;
         }
     }
@@ -40,7 +40,7 @@ int parse_timecodesv1(FILE *f, int total, udata *ud)
     }
 
     while (n < total) {
-        ts[n++] = (int64_t) rint(t);
+        ts[n++] = (int64_t) (t + 0.5);
         t += 1000.0 / basefps;
     }
 
