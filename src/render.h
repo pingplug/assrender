@@ -21,6 +21,10 @@
 #define rgb2u709(c)  ((div65536(-6596 * _r(c) - 22189 * _g(c) + 28784 * _b(c)) + 128))
 #define rgb2v709(c)  ((div65536(28784 * _r(c) - 26145 * _g(c) - 2639  * _b(c)) + 128))
 
+#define rgb2y2020(c) ((div65536(14786 * _r(c) + 38160 * _g(c) + 3338  * _b(c)) + 16))
+#define rgb2u2020(c) ((div65536(-8038 * _r(c) - 20746 * _g(c) + 28784 * _b(c)) + 128))
+#define rgb2v2020(c) ((div65536(28784 * _r(c) - 26469 * _g(c) - 2315  * _b(c)) + 128))
+
 #define blend(srcA, srcC, dstC) \
     ((div255(srcA * srcC + (255 - srcA) * dstC)))
 #define scale(srcA, srcC, dstC) \

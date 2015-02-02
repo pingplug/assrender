@@ -89,10 +89,14 @@ void blit444(ASS_Image* img, uint8_t* dataY, uint8_t* dataU, uint8_t* dataV,
             y = rgb2y709(img->color);
             u = rgb2u709(img->color);
             v = rgb2v709(img->color);
-        } else {
+        } else if (colorspace == BT601) {
             y = rgb2y601(img->color);
             u = rgb2u601(img->color);
             v = rgb2v601(img->color);
+        } else {
+            y = rgb2y2020(img->color);
+            u = rgb2u2020(img->color);
+            v = rgb2v2020(img->color);
         }
 
         opacity = 255 - _a(img->color);
@@ -262,8 +266,10 @@ AVS_VideoFrame* AVSC_CC assrender_get_frame(AVS_FilterInfo* p, int n)
 
                     if (ud->colorspace == BT709) {
                         y = rgb2y709(img->color);
-                    } else {
+                    } else if (ud->colorspace == BT601) {
                         y = rgb2y601(img->color);
+                    } else {
+                        y = rgb2y2020(img->color);
                     }
 
                     uint8_t opacity = 255 - _a(img->color);

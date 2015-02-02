@@ -41,7 +41,9 @@ string srt_font:
     Defaults to whatever Fontconfig chooses for “sans-serif”.
 string colorspace:
     The color space of your (YUV) video. Possible values:
+        - Rec2020, BT.2020
         - Rec709, BT.709
         - Rec601, BT.601
     Default is to use the ASS script’s “Video Colorspace” property, else guess
-    based on video resolution (width > 1280 or height > 576 → BT.709).
+    based on video resolution (width > 1920 or height > 1080 → BT.2020,
+    then width > 1280 or height > 576 → BT.709).

@@ -18,7 +18,8 @@
 
 enum csp {
     BT601,
-    BT709
+    BT709,
+    BT2020
 };
 
 enum plane { Y, U, V };
