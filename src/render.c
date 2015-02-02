@@ -51,19 +51,18 @@ void blit_rgb(uint8_t *data, ASS_Image *img, uint32_t pitch, uint32_t height,
 
         for (y = 0; y < img->h; y++) {
             for (x = 0; x < img->w; ++x) {
-                k = (sp[x] * a + 255) >> 8;
+                k = div255(sp[x] * a);
 
                 if (k && numc == 4) {
-                    outa = (k * 255 + (dst[c + 3] * (255 - k)) + 255) >> 8;
-                    dst[c    ] = blend(k, b, dst[c + 3], dst[c    ], outa);
-                    dst[c + 1] = blend(k, g, dst[c + 3], dst[c + 1], outa);
-                    dst[c + 2] = blend(k, r, dst[c + 3], dst[c + 2], outa);
-                    dst[c + 3] = outa;
+                    outa = scale(k, 255, dst[c + 3]);
+                    dst[c    ] = dblend(k, b, dst[c + 3], dst[c    ], outa);
+                    dst[c + 1] = dblend(k, g, dst[c + 3], dst[c + 1], outa);
+                    dst[c + 2] = dblend(k, r, dst[c + 3], dst[c + 2], outa);
+                    dst[c + 3] = div255(outa);
                 } else {
-                    k = (sp[x] * a + 255) >> 8;
-                    dst[c    ] = (k * b + (255 - k) * dst[c    ] + 255) >> 8;
-                    dst[c + 1] = (k * g + (255 - k) * dst[c + 1] + 255) >> 8;
-                    dst[c + 2] = (k * r + (255 - k) * dst[c + 2] + 255) >> 8;
+                    dst[c    ] = blend(k, b, dst[c    ]);
+                    dst[c + 1] = blend(k, g, dst[c + 1]);
+                    dst[c + 2] = blend(k, r, dst[c + 2]);
                 }
 
                 c += numc;
@@ -87,13 +86,13 @@ void blit444(ASS_Image *img, uint8_t *dataY, uint8_t *dataU, uint8_t *dataV,
 
     while (img) {
         if (colorspace == BT709) {
-            y = rgba2y709(img->color);
-            u = rgba2u709(img->color);
-            v = rgba2v709(img->color);
+            y = rgb2y709(img->color);
+            u = rgb2u709(img->color);
+            v = rgb2v709(img->color);
         } else {
-            y = rgba2y601(img->color);
-            u = rgba2u601(img->color);
-            v = rgba2v601(img->color);
+            y = rgb2y601(img->color);
+            u = rgb2u601(img->color);
+            v = rgb2v601(img->color);
         }
 
         opacity = 255 - _a(img->color);
@@ -110,10 +109,10 @@ void blit444(ASS_Image *img, uint8_t *dataY, uint8_t *dataU, uint8_t *dataV,
 
         for (i = 0; i < img->h; ++i) {
             for (j = 0; j < img->w; ++j) {
-                k = (src[j] * opacity + 255) >> 8;
-                dsty[j] = (k * y + (255 - k) * dsty[j] + 255) >> 8;
-                dstu[j] = (k * u + (255 - k) * dstu[j] + 255) >> 8;
-                dstv[j] = (k * v + (255 - k) * dstv[j] + 255) >> 8;
+                k = div255(src[j] * opacity);
+                dsty[j] = blend(k, y, dsty[j]);
+                dstu[j] = blend(k, u, dstu[j]);
+                dstv[j] = blend(k, v, dstv[j]);
             }
 
             src  += img->stride;
@@ -262,9 +261,9 @@ AVS_VideoFrame *AVSC_CC assrender_get_frame(AVS_FilterInfo *p, int n)
                     uint8_t y;
 
                     if (ud->colorspace == BT709) {
-                        y = rgba2y709(img->color);
+                        y = rgb2y709(img->color);
                     } else {
-                        y = rgba2y601(img->color);
+                        y = rgb2y601(img->color);
                     }
 
                     uint8_t opacity = 255 - _a(img->color);
@@ -281,8 +280,8 @@ AVS_VideoFrame *AVSC_CC assrender_get_frame(AVS_FilterInfo *p, int n)
 
                     for (i = 0; i < img->h; ++i) {
                         for (j = 0; j < img->w; ++j) {
-                            uint32_t k = (src[j] * opacity + 255) >> 8;
-                            dsty[j] = (k * y + (255 - k) * dsty[j] + 255) >> 8;
+                            uint32_t k = div255(src[j] * opacity);
+                            dsty[j] = blend(k, y, dsty[j]);
                         }
 
                         src  += img->stride;
