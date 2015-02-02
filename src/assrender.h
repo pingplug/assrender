@@ -22,8 +22,6 @@ enum csp {
     BT2020
 };
 
-enum plane { Y, U, V };
-
 typedef struct {
     uint8_t* uv_tmp[2];
     struct lbounds {

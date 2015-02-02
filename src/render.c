@@ -167,100 +167,98 @@ AVS_VideoFrame* AVSC_CC assrender_get_frame(AVS_FilterInfo* p, int n)
 
     img = ass_render_frame(ass_renderer, ass, ts, NULL);
 
-    if (avs_is_rgb32(&p->vi) || avs_is_rgb24(&p->vi)) {
-        blit_rgb(data, img, pitch, height, avs_is_rgb32(&p->vi) ? 4 : 3);
-    } else if (avs_is_yuy2(&p->vi)) {
-        // TODO
-    } else if (avs_is_yuv(&p->vi)) {
+    if (img) {
+        if (avs_is_rgb32(&p->vi)) { // RGBA
+            blit_rgb(data, img, pitch, height, 4);
+        } else if (avs_is_rgb24(&p->vi)) { // RGB
+            blit_rgb(data, img, pitch, height, 3);
+        } else if (avs_is_yuy2(&p->vi)) { // YUY2
+            // TODO
+        } else if (avs_is_planar(&p->vi)) {
+            if (heightUV && heightUV < height) { // YV12
+                int i, j;
+                static ASS_Image* im;
+                uint8_t *dstu, *dstv, *srcu, *srcv;
+                uint8_t *dstu_next, *dstv_next, *srcu_next, *srcv_next;
 
-        if (avs_is_yv12(&p->vi)) {
-            int i, j;
-            static ASS_Image* im;
-            uint8_t *dstu, *dstv, *srcu, *srcv;
-            uint8_t *dstu_next, *dstv_next, *srcu_next, *srcv_next;
-
-            if (img) {
-                for (i = 0; i < (height + 1) >> 1; i++) {
-                    ud->lbounds[i].start = 65535;
-                    ud->lbounds[i].end = 0;
-                }
-
-                for (im = img; im; im = im->next)
-                    setbounds(ud, im->dst_y, im->dst_y + im->h,
-                              im->dst_x, im->dst_x + im->w);
-
-                dstu = ud->uv_tmp[0];
-                dstv = ud->uv_tmp[1];
-                srcu = dataU;
-                srcv = dataV;
-
-                for (i = 0; i < (height + 1) >> 1; i++) {
-                    struct lbounds* lb = ud->lbounds + i;
-                    dstu_next = dstu + pitch;
-                    dstv_next = dstv + pitch;
-
-                    for (j = lb->start; j < lb->end; j++) {
-                        dstu[j << 1]
-                        = dstu[(j << 1) + 1]
-                        = dstu_next[j << 1]
-                        = dstu_next[(j << 1) + 1]
-                        = srcu[j];
-
-                        dstv[j << 1]
-                        = dstv[(j << 1) + 1]
-                        = dstv_next[j << 1]
-                        = dstv_next[(j << 1) + 1]
-                        = srcv[j];
+                if (img) {
+                    for (i = 0; i < (height + 1) >> 1; i++) {
+                        ud->lbounds[i].start = 65535;
+                        ud->lbounds[i].end = 0;
                     }
 
-                    srcu += pitchUV;
-                    srcv += pitchUV;
-                    dstu = dstu_next + pitch;
-                    dstv = dstv_next + pitch;
-                }
+                    for (im = img; im; im = im->next)
+                        setbounds(ud, im->dst_y, im->dst_y + im->h, im->dst_x, im->dst_x + im->w);
 
-                blit444(img, dataY, ud->uv_tmp[0], ud->uv_tmp[1], pitch,
-                        ud->colorspace);
+                    dstu = ud->uv_tmp[0];
+                    dstv = ud->uv_tmp[1];
+                    srcu = dataU;
+                    srcv = dataV;
 
-                srcu = ud->uv_tmp[0];
-                srcv = ud->uv_tmp[1];
-                srcu_next = srcu + pitch;
-                srcv_next = srcv + pitch;
-                dstu = dataU;
-                dstv = dataV;
+                    for (i = 0; i < (height + 1) >> 1; i++) {
+                        struct lbounds* lb = ud->lbounds + i;
+                        dstu_next = dstu + pitch;
+                        dstv_next = dstv + pitch;
 
-                for (i = 0; i < (height + 1) >> 1; ++i) {
-                    for (j = ud->lbounds[i].start;
-                            j < ud->lbounds[i].end; j++) {
-                        dstu[j] = (
-                                      srcu[j << 1]
-                                      + srcu[(j << 1) + 1]
-                                      + srcu_next[j << 1]
-                                      + srcu_next[(j << 1) + 1]
-                                  ) >> 2;
+                        for (j = lb->start; j < lb->end; j++) {
+                            dstu[j << 1]
+                            = dstu[(j << 1) + 1]
+                            = dstu_next[j << 1]
+                            = dstu_next[(j << 1) + 1]
+                            = srcu[j];
 
-                        dstv[j] = (
-                                      srcv[j << 1]
-                                      + srcv[(j << 1) + 1]
-                                      + srcv_next[j << 1]
-                                      + srcv_next[(j << 1) + 1]
-                                  ) >> 2;
+                            dstv[j << 1]
+                            = dstv[(j << 1) + 1]
+                            = dstv_next[j << 1]
+                            = dstv_next[(j << 1) + 1]
+                            = srcv[j];
+                        }
+
+                        srcu += pitchUV;
+                        srcv += pitchUV;
+                        dstu = dstu_next + pitch;
+                        dstv = dstv_next + pitch;
                     }
 
-                    dstu += pitchUV;
-                    dstv += pitchUV;
-                    srcu      = srcu_next + pitch;
+                    blit444(img, dataY, ud->uv_tmp[0], ud->uv_tmp[1], pitch, ud->colorspace);
+
+                    srcu = ud->uv_tmp[0];
+                    srcv = ud->uv_tmp[1];
                     srcu_next = srcu + pitch;
-                    srcv      = srcv_next + pitch;
                     srcv_next = srcv + pitch;
+                    dstu = dataU;
+                    dstv = dataV;
+
+                    for (i = 0; i < (height + 1) >> 1; ++i) {
+                        for (j = ud->lbounds[i].start; j < ud->lbounds[i].end; j++) {
+                            dstu[j] = (
+                                        srcu[j << 1]
+                                        + srcu[(j << 1) + 1]
+                                        + srcu_next[j << 1]
+                                        + srcu_next[(j << 1) + 1]
+                                      ) >> 2;
+
+                            dstv[j] = (
+                                        srcv[j << 1]
+                                        + srcv[(j << 1) + 1]
+                                        + srcv_next[j << 1]
+                                        + srcv_next[(j << 1) + 1]
+                                      ) >> 2;
+                        }
+
+                        dstu += pitchUV;
+                        dstv += pitchUV;
+                        srcu      = srcu_next + pitch;
+                        srcu_next = srcu + pitch;
+                        srcv      = srcv_next + pitch;
+                        srcv_next = srcv + pitch;
+                    }
                 }
-            }
-        } else {
-            if (pitchUV && pitchUV < pitch) { // probably YV16
+            } else if (pitchUV && pitchUV < pitch) { // YV16
                 // TODO
-            } else if (pitchUV) // YV24
+            } else if (pitchUV == pitch) { // YV24
                 blit444(img, dataY, dataU, dataV, pitch, ud->colorspace);
-            else { // Y8
+            } else { // Y8
                 while (img) {
                     uint8_t y;
 
