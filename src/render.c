@@ -391,31 +391,15 @@ void apply_y8(uint8_t** sub_img, uint8_t** data, uint32_t* pitch, uint32_t width
 AVS_VideoFrame* AVSC_CC assrender_get_frame(AVS_FilterInfo* p, int n)
 {
     udata* ud = (udata*)p->user_data;
-    ASS_Track* ass = ud->ass;
-    ASS_Renderer* ass_renderer = ud->ass_renderer;
     ASS_Image* img;
     AVS_VideoFrame* src;
-    uint32_t height, width, pitch[2];
-    uint8_t *data[3];
+
     int64_t ts;
     int changed;
 
     src = avs_get_frame(p->child, n);
 
     avs_make_writable(p->env, &src);
-
-    if (avs_is_planar(&p->vi)) {
-        data[0] = avs_get_write_ptr_p(src, AVS_PLANAR_Y);
-        data[1] = avs_get_write_ptr_p(src, AVS_PLANAR_U);
-        data[2] = avs_get_write_ptr_p(src, AVS_PLANAR_V);
-        pitch[1] = avs_get_pitch_p(src, AVS_PLANAR_U);
-    } else {
-        data[0] = avs_get_write_ptr(src);
-    }
-
-    height = p->vi.height;
-    width = p->vi.width;
-    pitch[0] = avs_get_pitch(src);
 
     if (!ud->isvfr) {
         // it’s a casting party!
@@ -424,9 +408,26 @@ AVS_VideoFrame* AVSC_CC assrender_get_frame(AVS_FilterInfo* p, int n)
         ts = ud->timestamp[n];
     }
 
-    img = ass_render_frame(ass_renderer, ass, ts, &changed);
+    img = ass_render_frame(ud->ass_renderer, ud->ass, ts, &changed);
 
     if (img) {
+        uint32_t height, width, pitch[2];
+        uint8_t* data[3];
+
+        if (avs_is_planar(&p->vi)) {
+            data[0] = avs_get_write_ptr_p(src, AVS_PLANAR_Y);
+            data[1] = avs_get_write_ptr_p(src, AVS_PLANAR_U);
+            data[2] = avs_get_write_ptr_p(src, AVS_PLANAR_V);
+            pitch[0] = avs_get_pitch_p(src, AVS_PLANAR_Y);
+            pitch[1] = avs_get_pitch_p(src, AVS_PLANAR_U);
+        } else {
+            data[0] = avs_get_write_ptr(src);
+            pitch[0] = avs_get_pitch(src);
+        }
+
+        height = p->vi.height;
+        width = p->vi.width;
+
         if (changed) {
             memset(ud->sub_img[0], 0x00, height * width);
             make_sub_img(img, ud->sub_img, width, ud->color_matrix);
