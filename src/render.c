@@ -1,125 +1,36 @@
 #include "render.h"
 
-void make_sub_img_rgb(ASS_Image* img, uint8_t** sub_img, uint32_t width)
+inline void col2rgb(uint32_t* col, uint8_t* r, uint8_t* g, uint8_t* b)
 {
-    uint8_t r, g, b, a, a1, *src, *dstR, *dstG, *dstB, *dstA;
-    uint32_t i, j, dsta;
-
-    while (img) {
-        if (img->w == 0 || img->h == 0) {
-            img = img->next;
-            continue;
-        }
-
-        r = _r(img->color);
-        g = _g(img->color);
-        b = _b(img->color);
-        a1 = 255 - _a(img->color);
-
-        src = img->bitmap;
-        dstR = sub_img[1] + img->dst_y * width + img->dst_x;
-        dstG = sub_img[2] + img->dst_y * width + img->dst_x;
-        dstB = sub_img[3] + img->dst_y * width + img->dst_x;
-        dstA = sub_img[0] + img->dst_y * width + img->dst_x;
-
-        for (i = 0; i < img->h; i++) {
-            for (j = 0; j < img->w; j++) {
-                a = div255(src[j] * a1);
-                if (a) {
-                    if (dstA[j]) {
-                        dsta = scale(a, 255, dstA[j]);
-                        dstR[j] = dblend(a, r, dstA[j], dstR[j], dsta);
-                        dstG[j] = dblend(a, g, dstA[j], dstG[j], dsta);
-                        dstB[j] = dblend(a, b, dstA[j], dstB[j], dsta);
-                        dstA[j] = div255(dsta);
-                    } else {
-                        dstR[j] = r;
-                        dstG[j] = g;
-                        dstB[j] = b;
-                        dstA[j] = a;
-                    }
-                    if (dstB[j] < 10 && dstR[j] < 10 && dstG[j] > 200)
-                        fprintf(stderr, "%d %d  ", a, src[j]);
-                }
-            }
-
-            src += img->stride;
-            dstR += width;
-            dstG += width;
-            dstB += width;
-            dstA += width;
-        }
-
-        img = img->next;
-    }
+    *r = _r(*col);
+    *g = _g(*col);
+    *b = _b(*col);
 }
 
-void make_sub_img_yuv(ASS_Image* img, uint8_t** sub_img, uint32_t width, enum csp colorspace)
+inline void col2yuv601(uint32_t* col, uint8_t* y, uint8_t* u, uint8_t* v)
 {
-    uint8_t y, u, v, a, a1, *src, *dstY, *dstU, *dstV, *dstA;
-    uint32_t i, j, dsta;
-
-    while (img) {
-        if (img->w == 0 || img->h == 0) {
-            img = img->next;
-            continue;
-        }
-
-        if (colorspace == BT709) {
-            y = rgb2y709(img->color);
-            u = rgb2u709(img->color);
-            v = rgb2v709(img->color);
-        } else if (colorspace == BT601) {
-            y = rgb2y601(img->color);
-            u = rgb2u601(img->color);
-            v = rgb2v601(img->color);
-        } else {
-            y = rgb2y2020(img->color);
-            u = rgb2u2020(img->color);
-            v = rgb2v2020(img->color);
-        }
-
-        a1 = 255 - _a(img->color);
-
-        src = img->bitmap;
-        dstY = sub_img[1] + img->dst_y * width + img->dst_x;
-        dstU = sub_img[2] + img->dst_y * width + img->dst_x;
-        dstV = sub_img[3] + img->dst_y * width + img->dst_x;
-        dstA = sub_img[0] + img->dst_y * width + img->dst_x;
-
-        for (i = 0; i < img->h; i++) {
-            for (j = 0; j < img->w; j++) {
-                a = div255(src[j] * a1);
-                if (a) {
-                    if (dstA[j]) {
-                        dsta = scale(a, 255, dstA[j]);
-                        dstY[j] = dblend(a, y, dstA[j], dstY[j], dsta);
-                        dstU[j] = dblend(a, u, dstA[j], dstU[j], dsta);
-                        dstV[j] = dblend(a, v, dstA[j], dstV[j], dsta);
-                        dstA[j] = div255(dsta);
-                    } else {
-                        dstY[j] = y;
-                        dstU[j] = u;
-                        dstV[j] = v;
-                        dstA[j] = a;
-                    }
-                }
-            }
-
-            src += img->stride;
-            dstY += width;
-            dstU += width;
-            dstV += width;
-            dstA += width;
-        }
-
-        img = img->next;
-    }
+    *y = rgb2y601(*col);
+    *u = rgb2u601(*col);
+    *v = rgb2v601(*col);
 }
 
-void make_sub_img_y(ASS_Image* img, uint8_t** sub_img, uint32_t width, enum csp colorspace)
+inline void col2yuv709(uint32_t* col, uint8_t* y, uint8_t* u, uint8_t* v)
 {
-    uint8_t y, a, a1, *src, *dstY, *dstA;
+    *y = rgb2y709(*col);
+    *u = rgb2u709(*col);
+    *v = rgb2v709(*col);
+}
+
+inline void col2yuv2020(uint32_t* col, uint8_t* y, uint8_t* u, uint8_t* v)
+{
+    *y = rgb2y2020(*col);
+    *u = rgb2u2020(*col);
+    *v = rgb2v2020(*col);
+}
+
+void make_sub_img(ASS_Image* img, uint8_t** sub_img, uint32_t width, colMat color_matrix)
+{
+    uint8_t c1, c2, c3, a, a1, *src, *dstC1, *dstC2, *dstC3, *dstA;
     uint32_t i, j, dsta;
 
     while (img) {
@@ -128,18 +39,13 @@ void make_sub_img_y(ASS_Image* img, uint8_t** sub_img, uint32_t width, enum csp 
             continue;
         }
 
-        if (colorspace == BT709) {
-            y = rgb2y709(img->color);
-        } else if (colorspace == BT601) {
-            y = rgb2y601(img->color);
-        } else {
-            y = rgb2y2020(img->color);
-        }
-
+        color_matrix(&img->color, &c1, &c2, &c3);
         a1 = 255 - _a(img->color);
 
         src = img->bitmap;
-        dstY = sub_img[1] + img->dst_y * width + img->dst_x;
+        dstC1 = sub_img[1] + img->dst_y * width + img->dst_x;
+        dstC2 = sub_img[2] + img->dst_y * width + img->dst_x;
+        dstC3 = sub_img[3] + img->dst_y * width + img->dst_x;
         dstA = sub_img[0] + img->dst_y * width + img->dst_x;
 
         for (i = 0; i < img->h; i++) {
@@ -148,17 +54,23 @@ void make_sub_img_y(ASS_Image* img, uint8_t** sub_img, uint32_t width, enum csp 
                 if (a) {
                     if (dstA[j]) {
                         dsta = scale(a, 255, dstA[j]);
-                        dstY[j] = dblend(a, y, dstA[j], dstY[j], dsta);
+                        dstC1[j] = dblend(a, c1, dstA[j], dstC1[j], dsta);
+                        dstC2[j] = dblend(a, c2, dstA[j], dstC2[j], dsta);
+                        dstC3[j] = dblend(a, c3, dstA[j], dstC3[j], dsta);
                         dstA[j] = div255(dsta);
                     } else {
-                        dstY[j] = y;
+                        dstC1[j] = c1;
+                        dstC2[j] = c2;
+                        dstC3[j] = c3;
                         dstA[j] = a;
                     }
                 }
             }
 
             src += img->stride;
-            dstY += width;
+            dstC1 += width;
+            dstC2 += width;
+            dstC3 += width;
             dstA += width;
         }
 
@@ -521,55 +433,25 @@ AVS_VideoFrame* AVSC_CC assrender_get_frame(AVS_FilterInfo* p, int n)
     img = ass_render_frame(ass_renderer, ass, ts, &changed);
 
     if (img) {
-        if (avs_is_rgb32(&p->vi)) { // RGBA
-            if (changed) {
-                memset(ud->sub_img[0], 0x00, height * width);
-                make_sub_img_rgb(img, ud->sub_img, width);
-            }
+        if (changed) {
+            memset(ud->sub_img[0], 0x00, height * width);
+            make_sub_img(img, ud->sub_img, width, ud->color_matrix);
+        }
 
+        if (avs_is_rgb32(&p->vi)) { // RGBA
             apply_rgba(ud->sub_img, data, pitch, width, height);
         } else if (avs_is_rgb24(&p->vi)) { // RGB
-            if (changed) {
-                memset(ud->sub_img[0], 0x00, height * width);
-                make_sub_img_rgb(img, ud->sub_img, width);
-            }
-
             apply_rgb(ud->sub_img, data, pitch, width, height);
         } else if (avs_is_yuy2(&p->vi)) { // YUY2
-            if (changed) {
-                memset(ud->sub_img[0], 0x00, height * width);
-                make_sub_img_yuv(img, ud->sub_img, width, ud->colorspace);
-            }
-
             apply_yuy2(ud->sub_img, data, pitch, width, height);
         } else if (avs_is_planar(&p->vi)) {
             if (heightUV && heightUV < height) { // YV12
-                if (changed) {
-                    memset(ud->sub_img[0], 0x00, height * width);
-                    make_sub_img_yuv(img, ud->sub_img, width, ud->colorspace);
-                }
-
                 apply_yv12(ud->sub_img, dataY, dataU, dataV, pitch, pitchUV, width, height);
             } else if (pitchUV && pitchUV < pitch) { // YV16
-                if (changed) {
-                    memset(ud->sub_img[0], 0x00, height * width);
-                    make_sub_img_yuv(img, ud->sub_img, width, ud->colorspace);
-                }
-
                 apply_yv16(ud->sub_img, dataY, dataU, dataV, pitch, pitchUV, width, height);
             } else if (pitchUV == pitch) { // YV24
-                if (changed) {
-                    memset(ud->sub_img[0], 0x00, height * width);
-                    make_sub_img_yuv(img, ud->sub_img, width, ud->colorspace);
-                }
-
                 apply_yv24(ud->sub_img, dataY, dataU, dataV, pitch, width, height);
             } else { // Y8
-                if (changed) {
-                    memset(ud->sub_img[0], 0x00, height * width);
-                    make_sub_img_y(img, ud->sub_img, width, ud->colorspace);
-                }
-
                 apply_y8(ud->sub_img, dataY, pitch, width, height);
             }
         }

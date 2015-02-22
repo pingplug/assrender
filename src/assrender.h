@@ -16,11 +16,7 @@
 #define atoll _atoi64
 #endif
 
-enum csp {
-    BT601,
-    BT709,
-    BT2020
-};
+typedef void (* colMat)(uint32_t* col, uint8_t* c1, uint8_t* c2, uint8_t* c3);
 
 typedef struct {
     uint8_t* sub_img[4];
@@ -29,7 +25,7 @@ typedef struct {
     ASS_Library* ass_library;
     ASS_Renderer* ass_renderer;
     int64_t* timestamp;
-    enum csp colorspace;
+    colMat color_matrix;
 } udata;
 
 #endif

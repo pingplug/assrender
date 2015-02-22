@@ -174,19 +174,23 @@ AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment* env, AVS_Value args,
         data->isvfr = 0;
     }
 
-    if (!strcasecmp(tmpcsp, "bt.709") || !strcasecmp(tmpcsp, "rec709"))
-        data->colorspace = BT709;
-    else if (!strcasecmp(tmpcsp, "bt.601") || !strcasecmp(tmpcsp, "rec601"))
-        data->colorspace = BT601;
-    else if (!strcasecmp(tmpcsp, "bt.2020") || !strcasecmp(tmpcsp, "rec2020"))
-        data->colorspace = BT2020;
-    else {
-        if (fi->vi.width > 1920 || fi->vi.height > 1080)
-            data->colorspace = BT2020;
-        else if (fi->vi.width > 1280 || fi->vi.height > 576)
-            data->colorspace = BT709;
-        else
-            data->colorspace = BT601;
+    if (avs_is_rgb(&fi->vi)) {
+        data->color_matrix = col2rgb;
+    } else {
+        if (!strcasecmp(tmpcsp, "bt.709") || !strcasecmp(tmpcsp, "rec709"))
+            data->color_matrix = col2yuv709;
+        else if (!strcasecmp(tmpcsp, "bt.601") || !strcasecmp(tmpcsp, "rec601"))
+            data->color_matrix = col2yuv601;
+        else if (!strcasecmp(tmpcsp, "bt.2020") || !strcasecmp(tmpcsp, "rec2020"))
+            data->color_matrix = col2yuv2020;
+        else {
+            if (fi->vi.width > 1920 || fi->vi.height > 1080)
+                data->color_matrix = col2yuv2020;
+            else if (fi->vi.width > 1280 || fi->vi.height > 576)
+                data->color_matrix = col2yuv709;
+            else
+                data->color_matrix = col2yuv601;
+        }
     }
 
     free(tmpcsp);

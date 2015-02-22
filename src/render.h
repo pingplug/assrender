@@ -36,6 +36,14 @@
 #define dblend(srcA, srcC, dstA, dstC, outA) \
     (((srcA * srcC * 255 + dstA * dstC * (255 - srcA) + (outA >> 1)) / outA))
 
+void col2rgb(uint32_t* col, uint8_t* r, uint8_t* g, uint8_t* b);
+
+void col2yuv601(uint32_t* col, uint8_t* y, uint8_t* u, uint8_t* v);
+
+void col2yuv709(uint32_t* col, uint8_t* y, uint8_t* u, uint8_t* v);
+
+void col2yuv2020(uint32_t* col, uint8_t* y, uint8_t* u, uint8_t* v);
+
 AVS_VideoFrame* AVSC_CC assrender_get_frame(AVS_FilterInfo* p, int n);
 
 #endif
