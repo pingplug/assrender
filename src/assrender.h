@@ -16,7 +16,8 @@
 #define atoll _atoi64
 #endif
 
-typedef void (* colMat)(uint32_t* col, uint8_t* c1, uint8_t* c2, uint8_t* c3);
+typedef void (* fColMat)(uint32_t* col, uint8_t* c1, uint8_t* c2, uint8_t* c3);
+typedef void (* fPixel)(uint8_t** sub_img, uint8_t** data, uint32_t* pitch, uint32_t width, uint32_t height);
 
 typedef struct {
     uint8_t* sub_img[4];
@@ -25,7 +26,8 @@ typedef struct {
     ASS_Library* ass_library;
     ASS_Renderer* ass_renderer;
     int64_t* timestamp;
-    colMat color_matrix;
+    fColMat color_matrix;
+    fPixel apply;
 } udata;
 
 #endif

@@ -44,6 +44,20 @@ void col2yuv709(uint32_t* col, uint8_t* y, uint8_t* u, uint8_t* v);
 
 void col2yuv2020(uint32_t* col, uint8_t* y, uint8_t* u, uint8_t* v);
 
+void apply_rgba(uint8_t** sub_img, uint8_t** data, uint32_t* pitch, uint32_t width, uint32_t height);
+
+void apply_rgb(uint8_t** sub_img, uint8_t** data, uint32_t* pitch, uint32_t width, uint32_t height);
+
+void apply_yuy2(uint8_t** sub_img, uint8_t** data, uint32_t* pitch, uint32_t width, uint32_t height);
+
+void apply_yv12(uint8_t** sub_img, uint8_t** data, uint32_t* pitch, uint32_t width, uint32_t height);
+
+void apply_yv16(uint8_t** sub_img, uint8_t** data, uint32_t* pitch, uint32_t width, uint32_t height);
+
+void apply_yv24(uint8_t** sub_img, uint8_t** data, uint32_t* pitch, uint32_t width, uint32_t height);
+
+void apply_y8(uint8_t** sub_img, uint8_t** data, uint32_t* pitch, uint32_t width, uint32_t height);
+
 AVS_VideoFrame* AVSC_CC assrender_get_frame(AVS_FilterInfo* p, int n);
 
 #endif

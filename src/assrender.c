@@ -193,6 +193,35 @@ AVS_Value AVSC_CC assrender_create(AVS_ScriptEnvironment* env, AVS_Value args,
         }
     }
 
+    switch (fi->vi.pixel_type)
+    {
+    case 0xA0000008:
+        data->apply = apply_yv12;
+        break;
+    case 0xA0000308:
+        data->apply = apply_yv16;
+        break;
+    case 0xA000030B:
+        data->apply = apply_yv24;
+        break;
+    case 0xE0000000:
+        data->apply = apply_y8;
+        break;
+    case 0x60000004:
+        data->apply = apply_yuy2;
+        break;
+    case 0x50000001:
+        data->apply = apply_rgb;
+        break;
+    case 0x50000002:
+        data->apply = apply_rgba;
+        break;
+    default:
+        v = avs_new_value_error("AssRender: unsupported pixel type");
+        avs_release_clip(c);
+        return v;
+    }
+
     free(tmpcsp);
 
     data->sub_img[0] = malloc(fi->vi.width * fi->vi.height);
