@@ -13,18 +13,6 @@
 #define div255(x)   ((div256(x + div256(x))))
 #define div65535(x) ((div65536(x + div65536(x))))
 
-#define rgb2y601(c)  ((div65536(16829 * _r(c) + 33039 * _g(c) + 6416  * _b(c)) + 16))
-#define rgb2u601(c)  ((div65536(-9714 * _r(c) - 19070 * _g(c) + 28784 * _b(c)) + 128))
-#define rgb2v601(c)  ((div65536(28784 * _r(c) - 24103 * _g(c) - 4681  * _b(c)) + 128))
-
-#define rgb2y709(c)  ((div65536(11966 * _r(c) + 40254 * _g(c) + 4064  * _b(c)) + 16))
-#define rgb2u709(c)  ((div65536(-6596 * _r(c) - 22189 * _g(c) + 28784 * _b(c)) + 128))
-#define rgb2v709(c)  ((div65536(28784 * _r(c) - 26145 * _g(c) - 2639  * _b(c)) + 128))
-
-#define rgb2y2020(c) ((div65536(14786 * _r(c) + 38160 * _g(c) + 3338  * _b(c)) + 16))
-#define rgb2u2020(c) ((div65536(-8038 * _r(c) - 20746 * _g(c) + 28784 * _b(c)) + 128))
-#define rgb2v2020(c) ((div65536(28784 * _r(c) - 26469 * _g(c) - 2315  * _b(c)) + 128))
-
 #define blend(srcA, srcC, dstC) \
     ((div255(srcA * srcC + (255 - srcA) * dstC)))
 #define blend2(src1A, src1C, src2A, src2C, dstC) \
@@ -36,26 +24,17 @@
 #define dblend(srcA, srcC, dstA, dstC, outA) \
     (((srcA * srcC * 255 + dstA * dstC * (255 - srcA) + (outA >> 1)) / outA))
 
-void col2rgb(uint32_t* col, uint8_t* r, uint8_t* g, uint8_t* b);
-
-void col2yuv601(uint32_t* col, uint8_t* y, uint8_t* u, uint8_t* v);
-
-void col2yuv709(uint32_t* col, uint8_t* y, uint8_t* u, uint8_t* v);
-
-void col2yuv2020(uint32_t* col, uint8_t* y, uint8_t* u, uint8_t* v);
+void col2rgb(uint32_t* c, uint8_t* r, uint8_t* g, uint8_t* b);
+void col2yuv601(uint32_t* c, uint8_t* y, uint8_t* u, uint8_t* v);
+void col2yuv709(uint32_t* c, uint8_t* y, uint8_t* u, uint8_t* v);
+void col2yuv2020(uint32_t* c, uint8_t* y, uint8_t* u, uint8_t* v);
 
 void apply_rgba(uint8_t** sub_img, uint8_t** data, uint32_t* pitch, uint32_t width, uint32_t height);
-
 void apply_rgb(uint8_t** sub_img, uint8_t** data, uint32_t* pitch, uint32_t width, uint32_t height);
-
 void apply_yuy2(uint8_t** sub_img, uint8_t** data, uint32_t* pitch, uint32_t width, uint32_t height);
-
 void apply_yv12(uint8_t** sub_img, uint8_t** data, uint32_t* pitch, uint32_t width, uint32_t height);
-
 void apply_yv16(uint8_t** sub_img, uint8_t** data, uint32_t* pitch, uint32_t width, uint32_t height);
-
 void apply_yv24(uint8_t** sub_img, uint8_t** data, uint32_t* pitch, uint32_t width, uint32_t height);
-
 void apply_y8(uint8_t** sub_img, uint8_t** data, uint32_t* pitch, uint32_t width, uint32_t height);
 
 AVS_VideoFrame* AVSC_CC assrender_get_frame(AVS_FilterInfo* p, int n);
